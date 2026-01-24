@@ -9,22 +9,29 @@ class EmailService:
         recipient = "Dinakar.anumolu@zohomail.com"
         subject = f"Trade Confirmation: {trade_details['action']} {trade_details['symbol']}"
         
+        # Prepare dynamic content based on action
+        pnl_section = ""
+        if 'profit_loss' in trade_details and trade_details['action'] == 'SELL':
+            pnl = trade_details['profit_loss']
+            pnl_color = "GREEN" if pnl >= 0 else "RED"
+            pnl_section = f"Profit/Loss: ${pnl:.2f} ({pnl_color})"
+
         body = f"""
         Dear User,
         
-        Your trade has been executed successfully.
+        A trade has been executed on your account.
         
-        Details:
-        -------------------------
-        Action:   {trade_details['action']}
-        Symbol:   {trade_details['symbol']}
-        Quantity: {trade_details['amount']}
-        Price:    ${trade_details['price']:.2f}
-        Total:    ${trade_details['amount'] * trade_details['price']:.2f}
-        Date:     {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        -------------------------
+        Transaction Details
+        ====================
+        Action:        {trade_details['action']}
+        Ticker:        {trade_details['symbol']}
+        Strike Price:  ${trade_details['price']:.2f}
+        Quantity:      {trade_details['amount']}
+        Total Value:   ${trade_details['amount'] * trade_details['price']:.2f}
+        Date:          {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        {pnl_section}
         
-        Thank you for trading with ComodityVision.
+        Happy Trading!
         """
         
         # SMTP Implementation

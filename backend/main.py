@@ -232,17 +232,23 @@ async def execute_trade(trade: TradeRequest, background_tasks: BackgroundTasks, 
 
     # 2. Identify Email Recipient
     # User's email from env
-    user_email = settings.EMAIL_SENDER 
-    
-    # 3. Send Email in Background
-    email_data = {
-        "symbol": trade.symbol,
+    # 2. Trigger Email Notification
+    trade_details = {
         "action": trade.action,
-        "amount": trade.amount,
+        "symbol": trade.symbol,
         "price": trade.price,
-        "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        "amount": trade.amount,
+        "date": timestamp
     }
     
-    background_tasks.add_task(email_service.send_trade_confirmation, user_email, email_data)
-    
-    return {"status": "success", "message": "Trade executed"}
+    if trade.action == "SELL":
+        pnl = (trade.price - cost_basis) * trade.amount
+        trade_details['profit_loss'] = pnl
+        
+    background_tasks.add_task(email_service.send_trade_confirmation, trade_details)
+
+    return {
+        "status": "success",
+        "trade_id": "new", # SQLite doesn't return ID easily on partial insert without returning clause
+        "message": f"Trade {trade.action} executed"
+    }

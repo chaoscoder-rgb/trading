@@ -40,3 +40,24 @@ Trade Confirmation: BUY SI
         
 -----------------------------------
 
+--- EMAIL LOG (FALLBACK) TO Dinakar.anumolu@zohomail.com ---
+Trade Confirmation: BUY SI
+
+        Dear User,
+        
+        A trade has been executed on your account.
+        
+        Transaction Details
+        ====================
+        Action:        BUY
+        Ticker:        SI
+        Strike Price:  $31.66
+        Quantity:      100.0
+        Total Value:   $3166.00
+        Date:          2026-01-24 15:08:03
+        
+        
+        Happy Trading!
+        
+-----------------------------------
+
