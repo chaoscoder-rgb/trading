@@ -367,11 +367,50 @@ const Dashboard = () => {
                                                         />
                                                     </div>
                                                     <div className="text-[10px] italic text-gray-400">{selectedCommodity.recommendation.reason}</div>
+
+                                                    {selectedCommodity.recommendation.breakdown && (
+                                                        <div className="mt-4 pt-4 border-t border-gray-100">
+                                                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">Consensus Breakdown</div>
+                                                            <div className="grid grid-cols-4 gap-2 text-center">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[9px] font-bold text-blue-500">News</span>
+                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.news)}</span>
+                                                                </div>
+                                                                <div className="flex flex-col border-l border-gray-100">
+                                                                    <span className="text-[9px] font-bold text-purple-500">Tech</span>
+                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.technical)}</span>
+                                                                </div>
+                                                                <div className="flex flex-col border-l border-gray-100">
+                                                                    <span className="text-[9px] font-bold text-orange-500">Polls</span>
+                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.polymarket)}</span>
+                                                                </div>
+                                                                <div className="flex flex-col border-l border-gray-100">
+                                                                    <span className="text-[9px] font-bold text-green-500">Macro</span>
+                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.macro)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-3 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
                                                 <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Model Performance</span>
+                                                    <div className="flex items-center gap-2">
+                                                        {selectedCommodity.recommendation.historical_accuracy?.total > 0 ? (
+                                                            <>
+                                                                <span className={`text-sm font-bold ${selectedCommodity.recommendation.historical_accuracy.rate >= 50 ? 'text-green-600' : 'text-orange-600'}`}>
+                                                                    {selectedCommodity.recommendation.historical_accuracy.rate}% Accuracy
+                                                                </span>
+                                                                <span className="text-[9px] text-gray-400">({selectedCommodity.recommendation.historical_accuracy.total} verified)</span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs font-medium text-gray-400 italic">Insufficient History</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col border-l border-gray-100 pl-3">
                                                     <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Volatility</span>
                                                     <span className="text-base font-bold text-red-500">{selectedCommodity.recommendation.risk?.volatility || 0}%</span>
                                                 </div>

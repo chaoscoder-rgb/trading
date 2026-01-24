@@ -75,6 +75,20 @@ async def init_db():
                 )
             """)
             
+            # Recommendation History (for Self-Correction/Backtesting)
+            await client.execute("""
+                CREATE TABLE IF NOT EXISTS recommendation_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT,
+                    action TEXT,
+                    price_at_rec REAL,
+                    confidence REAL,
+                    timestamp DATETIME,
+                    status TEXT DEFAULT 'Pending', -- Pending, Correct, Incorrect
+                    price_after_7d REAL
+                )
+            """)
+            
             await seed_commodities(client)
             print("Database Initialized.")
         except Exception as e:

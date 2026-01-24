@@ -83,7 +83,7 @@ async def delete_commodity(symbol: str, db = Depends(get_db)):
     return {"status": "success", "message": f"{symbol} removed"}
 
 @app.get("/api/commodities")
-async def get_commodities(db = Depends(get_db)):
+async def get_commodities(background_tasks: BackgroundTasks, db = Depends(get_db)):
     # Get all commodities, newest first
     rs = await db.execute("SELECT symbol, name, id FROM commodities ORDER BY id DESC")
     
@@ -101,7 +101,7 @@ async def get_commodities(db = Depends(get_db)):
             
             risk_data = analysis.get('risk', {"level": "Medium", "volatility": 0.0})
             
-            return {
+            commodity_data = {
                 "id": symbol,
                 "symbol": symbol,
                 "name": com['name'],
@@ -112,15 +112,23 @@ async def get_commodities(db = Depends(get_db)):
                 "recommendation": {
                     "action": analysis['action'],
                     "confidence": analysis['confidence'],
+                    "breakdown": analysis.get('breakdown'),
                     "reason": analysis['reason'],
                     "analysis": analysis['analysis'],
                     "indicators": analysis.get('indicators'),
                     "macro": analysis.get('macro'),
                     "unusual_flow": analysis.get('unusual_flow'),
+                    "historical_accuracy": analysis.get('historical_accuracy'),
                     "risk": risk_data,
                     "polls": analysis.get('polls', [])
                 }
             }
+
+            # Log for backtesting (one per day)
+            if analysis['action'] in ["Buy", "Strong Buy", "Sell", "Strong Sell"]:
+                background_tasks.add_task(log_recommendation, symbol, analysis['action'], data.get('price', 0.0), analysis['confidence'])
+
+            return commodity_data
         except Exception as e:
             print(f"Error processing {symbol}: {e}")
             return None
@@ -131,6 +139,29 @@ async def get_commodities(db = Depends(get_db)):
     
     # Filter out any None results from errors
     return [r for r in results if r is not None]
+
+async def log_recommendation(symbol: str, action: str, price: float, confidence: float):
+    """
+    Background task to log recommendations once per day per symbol.
+    """
+    from app.db import get_db
+    async for db in get_db():
+        try:
+            # Check if already logged today
+            today = datetime.now().strftime('%Y-%m-%d')
+            rs = await db.execute(
+                "SELECT id FROM recommendation_history WHERE symbol = ? AND date(timestamp) = ?", 
+                [symbol, today]
+            )
+            
+            if not rs.rows:
+                await db.execute(
+                    "INSERT INTO recommendation_history (symbol, action, price_at_rec, confidence, timestamp) VALUES (?, ?, ?, ?, ?)",
+                    [symbol, action, price, confidence, datetime.now()]
+                )
+        except Exception as e:
+            print(f"Error logging recommendation: {e}")
+        break 
 
 @app.get("/api/holdings")
 async def get_holdings(db = Depends(get_db)):

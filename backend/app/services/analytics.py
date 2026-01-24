@@ -135,109 +135,90 @@ class AnalyticsEngine:
         symbol = data.get('symbol', 'AAPL') 
         current_price = data.get('price', 0.0)
         
-        # 1. Real News Sentiment (Base: 50, Range: 0-100)
+        # 1. News Sentiment (40% Weight, Scale 0-100)
         news = await self.fetch_news(symbol)
         sentiment = self.analyze_sentiment(news)
         news_score = sentiment['score']
         
-        # 2. Technical Indicators Signal (Base: 0, Range: -30 to +30)
+        # 2. Technical Indicators (30% Weight, Scale 0-100)
         indicators = await data_engine.get_indicators(symbol)
         rsi = indicators.get('rsi', 50.0)
         sma = indicators.get('sma')
         
-        ti_score = 0
-        ti_signals = []
+        # Map RSI to 0-100 (Inverted: Low RSI is Bullish/High Score)
+        # 30 RSI -> 100 points, 70 RSI -> 0 points
+        if rsi < 30: rsi_score = 100
+        elif rsi > 70: rsi_score = 0
+        else: rsi_score = 100 - (rsi - 30) * (100 / 40)
         
-        # RSI Logic
-        if rsi < 35:
-            ti_score += 20
-            ti_signals.append(f"RSI is {rsi:.1f} (Oversold - Bullish)")
-        elif rsi > 65:
-            ti_score -= 20
-            ti_signals.append(f"RSI is {rsi:.1f} (Overbought - Bearish)")
-        else:
-            ti_signals.append(f"RSI is {rsi:.1f} (Neutral)")
-            
-        # SMA Logic
+        ti_score = rsi_score
+        ti_signals = [f"RSI is {rsi:.1f}"]
+        
+        # SMA Trend
         if sma:
             if current_price > sma:
-                ti_score += 10
-                ti_signals.append("Trend: Above SMA20 (Bullish)")
+                ti_score += 20
+                ti_signals.append("Above SMA20 (Bullish)")
             else:
-                ti_score -= 10
-                ti_signals.append("Trend: Below SMA20 (Bearish)")
+                ti_score -= 20
+                ti_signals.append("Below SMA20 (Bearish)")
         elif "sma_sim_signal" in indicators:
-            sig = indicators["sma_sim_signal"]
-            if sig == "Above SMA20":
-                ti_score += 10
-                ti_signals.append("Trend: Above SMA20 (Bullish)")
-            elif sig == "Below SMA20":
-                ti_score -= 10
-                ti_signals.append("Trend: Below SMA20 (Bearish)")
-
-        # 3. Smart Money & Political Sentiment (Base: 0, Range: -15 to +15)
-        from app.services.insider import insider_service
-        insider_tx = await insider_service.get_insider_transactions(symbol)
-        congress_tx = await insider_service.get_congress_trading(symbol)
+            if indicators["sma_sim_signal"] == "Above SMA20":
+                ti_score += 20
+                ti_signals.append("Above SMA20 (Bullish)")
+            elif indicators["sma_sim_signal"] == "Below SMA20":
+                ti_score -= 20
+                ti_signals.append("Below SMA20 (Bearish)")
         
-        insider_score, insider_status = insider_service.analyze_insider_sentiment(insider_tx)
-        
-        # Political Signal (Congessional) - Simplified detection
-        political_score = 0
-        political_signal = "Neutral"
-        if congress_tx:
-            # Finnhub returns a list of trades
-            recent_trades = congress_tx[:5]
-            buys = [t for t in recent_trades if t.get('transactionType') == 'Purchase']
-            sells = [t for t in recent_trades if t.get('transactionType') == 'Sale']
-            if len(buys) > len(sells):
-                political_score = 8
-                political_signal = f"Bullish Political Flow ({len(buys)} trades)"
-            elif len(sells) > len(buys):
-                political_score = -8
-                political_signal = f"Bearish Political Flow ({len(sells)} trades)"
+        ti_score = max(0, min(100, ti_score))
 
-        # 4. Macroeconomic Correlations (Base: 0, Range: -15 to +15)
+        # 3. Polymarket (20% Weight, Scale 0-100)
+        from app.services.polymarket import polymarket_service
+        polls = await polymarket_service.get_related_markets(symbol)
+        pm_score = polymarket_service.calculate_sentiment_score(polls)
+
+        # 4. Macro Data (10% Weight, Scale 0-100)
         dxy = await fred_service.get_dollar_index()
         yield_10y = await fred_service.get_10y_yield()
         fed_rate = await fred_service.get_fed_funds_rate()
 
-        macro_score = 0
+        macro_raw = 50
         macro_signals = []
-        
-        # DXY Impact
         if dxy:
-            if dxy > 105:
-                macro_score -= 5
-                macro_signals.append("Headwind: Strong Dollar")
-            elif dxy < 100:
-                macro_score += 5
-                macro_signals.append("Tailwind: Weak Dollar")
+            if dxy < 100: macro_raw += 25; macro_signals.append("Weak Dollar")
+            elif dxy > 105: macro_raw -= 25; macro_signals.append("Strong Dollar")
+            
+        if fed_rate:
+            if fed_rate < 3.0: macro_raw += 25; macro_signals.append("Low Interest Rates")
+            elif fed_rate > 5.0: macro_raw -= 25; macro_signals.append("High Interest Rates")
 
-        # Interest Rate Impact
-        if fed_rate and fed_rate > 5.0:
-            macro_score -= 5
-            macro_signals.append("Headwind: High Interest Rates")
-        
-        # 10Y Yield Impact (Specific to Metals)
         if yield_10y and symbol in ["GC", "SI"]:
-            if yield_10y > 4.0:
-                macro_score -= 5
-                macro_signals.append("Headwind: Rising Yields (Bearish for Metals)")
-            elif yield_10y < 3.5:
-                macro_score += 5
-                macro_signals.append("Tailwind: Falling Yields (Bullish for Metals)")
+            if yield_10y < 3.5: macro_raw += 25; macro_signals.append("Falling Yields")
+            elif yield_10y > 4.5: macro_raw -= 25; macro_signals.append("Rising Yields")
+            
+        macro_score = max(0, min(100, macro_raw))
+        macro_status = ", ".join(macro_signals) if macro_signals else "Neutral"
 
-        macro_status = " / ".join(macro_signals) if macro_signals else "Macro Neutral"
-
-        # 5. Weighted Confidence (Dynamic Weights based on data availability)
-        # Weights: News 35%, Technicals 30%, Macro 20%, Smart Money 15%
-        confidence = news_score + ti_score + macro_score + insider_score + political_score
-        confidence = max(0, min(100, confidence)) # Clamp
+        # 5. Weighted Consensus Calculation
+        # Weights: News 40%, Tech 30%, Polymarket 20%, Macro 10%
+        confidence = (news_score * 0.4) + (ti_score * 0.3) + (pm_score * 0.2) + (macro_score * 0.1)
         
-        # 6. Determine Action based on Confidence
-        if confidence >= 80: action = "Strong Buy"
-        elif confidence >= 60: action = "Buy"
+        # Optional: Incorporate Smart Money as a minor bias (e.g., +/- 5 points)
+        from app.services.insider import insider_service
+        insider_tx = await insider_service.get_insider_transactions(symbol)
+        congress_tx = await insider_service.get_congress_trading(symbol)
+        ins_score, insider_status = insider_service.analyze_insider_sentiment(insider_tx)
+        
+        political_signal = "Neutral"
+        if congress_tx:
+            buys = [t for t in congress_tx[:5] if t.get('transactionType') == 'Purchase']
+            sells = [t for t in congress_tx[:5] if t.get('transactionType') == 'Sale']
+            if len(buys) > len(sells): political_signal = "Bullish Political Flow"
+            elif len(sells) > len(buys): political_signal = "Bearish Political Flow"
+
+        # 6. Determine Action
+        if confidence >= 75: action = "Strong Buy"
+        elif confidence >= 55: action = "Buy"
         elif confidence >= 40: action = "Hold"
         elif confidence >= 25: action = "Sell"
         else: action = "Strong Sell"
@@ -265,7 +246,13 @@ class AnalyticsEngine:
         return {
             "action": action,
             "confidence": round(confidence, 1),
-            "reason": f"{'Mixed' if abs(ti_score) > 0 else 'Sentiment'} Analysis: {ti_signals[0] if ti_signals else ''}",
+            "breakdown": {
+                "news": round(news_score, 1),
+                "technical": round(ti_score, 1),
+                "polymarket": round(pm_score, 1),
+                "macro": round(macro_score, 1)
+            },
+            "reason": f"{'Mixed' if abs(ti_score - 50) > 10 else 'Sentiment'} Analysis: {ti_signals[0] if ti_signals else ''}",
             "indicators": {
                 "rsi": round(rsi, 1),
                 "sma": round(sma, 2) if sma else None,
@@ -289,6 +276,34 @@ class AnalyticsEngine:
             }
         }
 
+    async def get_historical_accuracy(self, symbol: str) -> dict:
+        """
+        Calculate accuracy rate for this symbol based on recommendation history.
+        """
+        from app.db import get_db
+        async for db in get_db():
+            try:
+                rs = await db.execute(
+                    "SELECT status FROM recommendation_history WHERE symbol = ? AND status != 'Pending'",
+                    [symbol]
+                )
+                total = len(rs.rows)
+                if total == 0:
+                    return {"rate": 0, "total": 0, "status": "No history"}
+                
+                correct = sum(1 for row in rs.rows if row[0] == 'Correct')
+                rate = (correct / total) * 100
+                
+                return {
+                    "rate": round(rate, 1),
+                    "total": total,
+                    "status": "Active"
+                }
+            except Exception:
+                return {"rate": 0, "total": 0, "status": "Error"}
+            break
+        return {"rate": 0, "total": 0, "status": "Unavailable"}
+
     async def generate_enhanced_recommendation(self, data: dict, symbol: str) -> dict:
         # Get base recommendation
         data['symbol'] = symbol
@@ -305,6 +320,10 @@ class AnalyticsEngine:
             rec["polls"] = polls
         except Exception:
             rec["polls"] = []
+
+        # 3. Fetch Historical Accuracy (Self-Correction)
+        accuracy = await self.get_historical_accuracy(symbol)
+        rec["historical_accuracy"] = accuracy
             
         return rec
 

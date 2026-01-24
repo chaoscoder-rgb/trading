@@ -43,17 +43,26 @@ class PolymarketService:
                     if any(t.lower() in question for t in terms):
                         outcomes = m.get("outcomes", "Yes/No")
                         prices = m.get("outcomePrices", [])
+                        if isinstance(prices, str):
+                            try:
+                                import json
+                                prices = json.loads(prices)
+                            except:
+                                continue
                         
-                        if len(prices) >= 2:
-                            yes_price = float(prices[0]) * 100
-                            no_price = float(prices[1]) * 100
-                            
-                            filtered.append({
-                                "question": m.get("question"),
-                                "yes": round(yes_price, 1),
-                                "no": round(no_price, 1),
-                                "volume": m.get("volume", 0)
-                            })
+                        if prices and len(prices) >= 2:
+                            try:
+                                yes_price = float(prices[0]) * 100
+                                no_price = float(prices[1]) * 100
+                                
+                                filtered.append({
+                                    "question": m.get("question"),
+                                    "yes": round(yes_price, 1),
+                                    "no": round(no_price, 1),
+                                    "volume": m.get("volume", 0)
+                                })
+                            except (ValueError, TypeError):
+                                continue
                 
                 # FALLBACK: If API search finds nothing (common for specific niche commodities in top 100)
                 if not filtered:
@@ -97,5 +106,18 @@ class PolymarketService:
             ]
         }
         return fallbacks.get(keyword, [])
+
+    def calculate_sentiment_score(self, polls: list) -> float:
+        """
+        Calculate a 0-100 bullishness score based on Polymarket odds.
+        """
+        if not polls:
+            return 50.0
+            
+        # Average the 'yes' prices
+        total_yes = sum(p.get('yes', 50.0) for p in polls)
+        score = total_yes / len(polls)
+        
+        return round(max(0, min(100, score)), 1)
 
 polymarket_service = PolymarketService()
