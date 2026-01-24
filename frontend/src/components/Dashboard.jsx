@@ -88,6 +88,7 @@ const Dashboard = () => {
             });
             alert(`${tradeConfig.action} order placed for ${selectedCommodity.symbol} @ $${tradeConfig.price}`);
             setTradeModalOpen(false);
+            loadHoldings();
         } catch (error) {
             alert("Trade failed");
         }
@@ -158,6 +159,17 @@ const Dashboard = () => {
             loadData();
         } catch (err) {
             alert("Failed to remove commodity");
+        }
+    };
+
+    const handleSaveInline = async () => {
+        if (!editingHolding) return;
+        try {
+            await updateHolding(editingHolding.id, editingHolding);
+            setEditingHolding(null);
+            loadHoldings();
+        } catch (err) {
+            alert("Failed to update holding: " + err.message);
         }
     };
 
@@ -252,7 +264,6 @@ const Dashboard = () => {
                                 className={`border rounded-xl p-6 shadow-sm hover:shadow-lg transition-all cursor-pointer bg-white relative overflow-hidden group
                                     ${selectedCommodity?.symbol === item.symbol ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'border-gray-200'}`}
                                 onClick={() => setSelectedCommodity(item)}
-                            >
                             >
                                 <button
                                     onClick={(e) => handleDeleteCommodity(e, item.symbol)}
@@ -469,50 +480,101 @@ const Dashboard = () => {
                                         <th className="px-6 py-4 font-semibold text-right">Qty</th>
                                         <th className="px-6 py-4 font-semibold text-right">Avg Price</th>
                                         <th className="px-6 py-4 font-semibold text-right">Current Price</th>
-                                        <th className="px-6 py-4 font-semibold text-right">Time</th>
+                                        <th className="px-6 py-4 font-semibold text-right">Total Price</th>
+                                        <th className="px-6 py-4 font-semibold text-right">Date and Time</th>
                                         <th className="px-6 py-4 font-semibold text-right">P&L</th>
                                         <th className="px-6 py-4 font-semibold text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {holdings.map((h) => {
+                                        const isEditing = editingHolding && editingHolding.id === h.id;
                                         const currentPrice = commodities.find(c => c.symbol === h.symbol)?.price || 0;
-                                        const pnl = (currentPrice - h.avg_price) * h.quantity;
+                                        const displayQty = isEditing ? editingHolding.quantity : h.quantity;
+                                        const displayAvg = isEditing ? editingHolding.avg_price : h.avg_price;
+
+                                        const pnl = (currentPrice - displayAvg) * displayQty;
                                         const pnlClass = pnl >= 0 ? 'text-green-600' : 'text-red-600';
                                         const lastUpdated = h.last_updated ? new Date(h.last_updated).toLocaleString() : '-';
 
                                         return (
                                             <tr key={h.id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-4 font-bold text-gray-800">{h.symbol}</td>
-                                                <td className="px-6 py-4 text-right font-mono">{h.quantity}</td>
-                                                <td className="px-6 py-4 text-right font-mono">${h.avg_price.toFixed(2)}</td>
+
+                                                {/* Edit Qty */}
+                                                <td className="px-6 py-4 text-right font-mono">
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            className="border rounded px-2 py-1 w-24 text-right"
+                                                            value={editingHolding.quantity}
+                                                            onChange={(e) => setEditingHolding({ ...editingHolding, quantity: parseFloat(e.target.value) || 0 })}
+                                                        />
+                                                    ) : h.quantity}
+                                                </td>
+
+                                                {/* Edit Avg Price */}
+                                                <td className="px-6 py-4 text-right font-mono">
+                                                    {isEditing ? (
+                                                        <div className="flex justify-end items-center gap-1">
+                                                            <span>$</span>
+                                                            <input
+                                                                type="number"
+                                                                className="border rounded px-2 py-1 w-24 text-right"
+                                                                value={editingHolding.avg_price}
+                                                                onChange={(e) => setEditingHolding({ ...editingHolding, avg_price: parseFloat(e.target.value) || 0 })}
+                                                            />
+                                                        </div>
+                                                    ) : `$${h.avg_price.toFixed(2)}`}
+                                                </td>
+
                                                 <td className="px-6 py-4 text-right font-mono text-gray-500">${currentPrice.toFixed(2)}</td>
+                                                <td className="px-6 py-4 text-right font-mono font-bold text-gray-800">${(displayQty * currentPrice).toFixed(2)}</td>
                                                 <td className="px-6 py-4 text-right text-xs text-gray-500">{lastUpdated}</td>
                                                 <td className={`px-6 py-4 text-right font-bold font-mono ${pnlClass}`}>
                                                     {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}
                                                 </td>
                                                 <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedCommodity(commodities.find(c => c.symbol === h.symbol) || { symbol: h.symbol, price: 0 });
-                                                            openTradeModal('SELL');
-                                                        }}
-                                                        className="text-white bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm font-bold shadow-sm"
-                                                    >
-                                                        Sell
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setEditingHolding(h)}
-                                                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteHolding(h.id)}
-                                                        className="text-red-400 hover:text-red-600 text-sm font-medium ml-2"
-                                                    >
-                                                        Remove
-                                                    </button>
+                                                    {isEditing ? (
+                                                        <>
+                                                            <button
+                                                                onClick={handleSaveInline}
+                                                                className="text-white bg-green-500 hover:bg-green-600 px-3 py-1 rounded text-sm font-bold"
+                                                            >
+                                                                Save
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingHolding(null)}
+                                                                className="text-gray-600 hover:text-gray-800 px-2 text-sm font-medium"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedCommodity(commodities.find(c => c.symbol === h.symbol) || { symbol: h.symbol, price: 0 });
+                                                                    openTradeModal('SELL');
+                                                                }}
+                                                                className="text-white bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm font-bold shadow-sm"
+                                                            >
+                                                                Sell
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingHolding(h)}
+                                                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteHolding(h.id)}
+                                                                className="text-red-400 hover:text-red-600 text-sm font-medium ml-2"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -522,6 +584,33 @@ const Dashboard = () => {
                                             <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
                                                 No holdings found. Add a dummy entry to start.
                                             </td>
+                                        </tr>
+                                    )}
+                                    {holdings.length > 0 && (
+                                        <tr className="bg-gray-50 font-bold border-t-2 border-gray-200">
+                                            <td colSpan="4" className="px-6 py-4 text-right text-gray-700">TOTAL</td>
+                                            <td className="px-6 py-4 text-right font-mono text-gray-800">
+                                                ${holdings.reduce((sum, h) => {
+                                                    const price = commodities.find(c => c.symbol === h.symbol)?.price || 0;
+                                                    return sum + (h.quantity * price);
+                                                }, 0).toFixed(2)}
+                                            </td>
+                                            <td></td>
+                                            <td className={`px-6 py-4 text-right font-mono ${holdings.reduce((sum, h) => {
+                                                const price = commodities.find(c => c.symbol === h.symbol)?.price || 0;
+                                                return sum + ((price - h.avg_price) * h.quantity);
+                                            }, 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                {holdings.reduce((sum, h) => {
+                                                    const price = commodities.find(c => c.symbol === h.symbol)?.price || 0;
+                                                    return sum + ((price - h.avg_price) * h.quantity);
+                                                }, 0) >= 0 ? '+' : ''}
+                                                {holdings.reduce((sum, h) => {
+                                                    const price = commodities.find(c => c.symbol === h.symbol)?.price || 0;
+                                                    return sum + ((price - h.avg_price) * h.quantity);
+                                                }, 0).toFixed(2)}
+                                            </td>
+                                            <td></td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -540,11 +629,11 @@ const Dashboard = () => {
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                                     <tr>
-                                        <th className="px-6 py-4 font-semibold">Date</th>
                                         <th className="px-6 py-4 font-semibold">Symbol</th>
                                         <th className="px-6 py-4 font-semibold text-right">Qty Sold</th>
                                         <th className="px-6 py-4 font-semibold text-right">Sale Price</th>
                                         <th className="px-6 py-4 font-semibold text-right">Total Sale</th>
+                                        <th className="px-6 py-4 font-semibold">Date</th>
                                         <th className="px-6 py-4 font-semibold text-right">Purchase Price</th>
                                         <th className="px-6 py-4 font-semibold text-right">Total Purchase</th>
                                         <th className="px-6 py-4 font-semibold text-right">P/L ($)</th>
@@ -552,7 +641,7 @@ const Dashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {history.map((tx) => {
+                                    {history.filter(tx => tx.type === 'SELL').map((tx) => {
                                         const totalSale = tx.amount * tx.price;
                                         const purchasePrice = tx.cost_basis || 0;
                                         const totalPurchase = tx.amount * purchasePrice;
@@ -562,11 +651,11 @@ const Dashboard = () => {
 
                                         return (
                                             <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 text-xs font-semibold text-gray-500">{dateStr}</td>
                                                 <td className="px-6 py-4 font-bold text-gray-800">{tx.commodity_symbol}</td>
                                                 <td className="px-6 py-4 text-right font-mono">{tx.amount}</td>
                                                 <td className="px-6 py-4 text-right font-mono">${tx.price.toFixed(2)}</td>
                                                 <td className="px-6 py-4 text-right font-mono">${totalSale.toFixed(2)}</td>
+                                                <td className="px-6 py-4 text-xs font-semibold text-gray-500">{dateStr}</td>
                                                 <td className="px-6 py-4 text-right font-mono text-gray-500">${purchasePrice.toFixed(2)}</td>
                                                 <td className="px-6 py-4 text-right font-mono text-gray-500">${totalPurchase.toFixed(2)}</td>
                                                 <td className={`px-6 py-4 text-right font-bold font-mono ${profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -585,6 +674,51 @@ const Dashboard = () => {
                                             </td>
                                         </tr>
                                     )}
+                                    {history.some(tx => tx.type === 'SELL') && (
+                                        <tr className="bg-gray-50 font-bold border-t-2 border-gray-200">
+                                            <td colSpan="3" className="px-6 py-4 text-right text-gray-700">TOTAL</td>
+                                            <td className="px-6 py-4 text-right font-mono text-gray-800">
+                                                ${history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => sum + (tx.amount * tx.price), 0).toFixed(2)}
+                                            </td>
+                                            <td></td>
+                                            <td></td>
+                                            <td className="px-6 py-4 text-right font-mono text-gray-500">
+                                                ${history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => sum + (tx.amount * (tx.cost_basis || 0)), 0).toFixed(2)}
+                                            </td>
+                                            <td className={`px-6 py-4 text-right font-mono ${history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => {
+                                                const totalSale = tx.amount * tx.price;
+                                                const totalPurchase = tx.amount * (tx.cost_basis || 0);
+                                                return sum + (totalSale - totalPurchase);
+                                            }, 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                {history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => {
+                                                    const totalSale = tx.amount * tx.price;
+                                                    const totalPurchase = tx.amount * (tx.cost_basis || 0);
+                                                    return sum + (totalSale - totalPurchase);
+                                                }, 0) >= 0 ? '+' : ''}
+                                                {history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => {
+                                                    const totalSale = tx.amount * tx.price;
+                                                    const totalPurchase = tx.amount * (tx.cost_basis || 0);
+                                                    return sum + (totalSale - totalPurchase);
+                                                }, 0).toFixed(2)}
+                                            </td>
+                                            <td className={`px-6 py-4 text-right font-mono ${history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => {
+                                                const totalSale = tx.amount * tx.price;
+                                                const totalPurchase = tx.amount * (tx.cost_basis || 0);
+                                                return sum + (totalSale - totalPurchase);
+                                            }, 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                {(
+                                                    (history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => {
+                                                        const totalSale = tx.amount * tx.price;
+                                                        const totalPurchase = tx.amount * (tx.cost_basis || 0);
+                                                        return sum + (totalSale - totalPurchase);
+                                                    }, 0) /
+                                                        (history.filter(tx => tx.type === 'SELL').reduce((sum, tx) => sum + (tx.amount * (tx.cost_basis || 0)), 0) || 1)) * 100
+                                                ).toFixed(2)}%
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -592,116 +726,64 @@ const Dashboard = () => {
                 </div>
             )}
 
-            {/* EDIT HOLDING MODAL */}
-            {editingHolding && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                        <h3 className="text-xl font-bold mb-4">{editingHolding.id ? 'Edit Holding' : 'New Holding'}</h3>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
-                                <input
-                                    type="text"
-                                    value={editingHolding.symbol}
-                                    onChange={e => setEditingHolding({ ...editingHolding, symbol: e.target.value.toUpperCase() })}
-                                    className="w-full border rounded-lg px-3 py-2 uppercase"
-                                    placeholder="e.g. CL"
-                                />
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                                    <input
-                                        type="number"
-                                        value={editingHolding.quantity}
-                                        onChange={e => setEditingHolding({ ...editingHolding, quantity: parseFloat(e.target.value) })}
-                                        className="w-full border rounded-lg px-3 py-2"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Avg Price</label>
-                                    <input
-                                        type="number"
-                                        value={editingHolding.avg_price}
-                                        onChange={e => setEditingHolding({ ...editingHolding, avg_price: parseFloat(e.target.value) })}
-                                        className="w-full border rounded-lg px-3 py-2"
-                                    />
-                                </div>
-                            </div>
-                        </div>
 
-                        <div className="flex justify-end gap-3 mt-8">
-                            <button
-                                onClick={() => setEditingHolding(null)}
-                                className="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSaveHolding}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow"
-                            >
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* TRADE MODAL */}
-            {tradeModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60]">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-up">
-                        <div className={`p-4 text-white font-bold flex justify-between items-center ${tradeConfig.action === 'BUY' ? 'bg-green-600' : 'bg-red-600'}`}>
-                            <span className="text-lg">{tradeConfig.action} {selectedCommodity?.symbol}</span>
-                            <button onClick={() => setTradeModalOpen(false)} className="opacity-70 hover:opacity-100">✕</button>
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Number of Shares</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={tradeConfig.quantity}
-                                    onChange={(e) => setTradeConfig({ ...tradeConfig, quantity: e.target.value })}
-                                    className="w-full border rounded-lg px-3 py-2 text-lg font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
+            {
+                tradeModalOpen && (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60]">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-up">
+                            <div className={`p-4 text-white font-bold flex justify-between items-center ${tradeConfig.action === 'BUY' ? 'bg-green-600' : 'bg-red-600'}`}>
+                                <span className="text-lg">{tradeConfig.action} {selectedCommodity?.symbol}</span>
+                                <button onClick={() => setTradeModalOpen(false)} className="opacity-70 hover:opacity-100">✕</button>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Strike Price ($)</label>
-                                <input
-                                    type="number"
-                                    value={tradeConfig.price}
-                                    onChange={(e) => setTradeConfig({ ...tradeConfig, price: e.target.value })}
-                                    className="w-full border rounded-lg px-3 py-2 text-lg font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
-                                <div className="text-xs text-gray-400 mt-1 flex justify-between">
-                                    <span>Market: ${parseFloat(selectedCommodity?.price || 0).toFixed(2)}</span>
-                                    <span onClick={() => setTradeConfig({ ...tradeConfig, price: parseFloat(selectedCommodity?.price).toFixed(2) })} className="text-blue-500 cursor-pointer hover:underline">Reset</span>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Number of Shares</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={tradeConfig.quantity}
+                                        onChange={(e) => setTradeConfig({ ...tradeConfig, quantity: e.target.value })}
+                                        className="w-full border rounded-lg px-3 py-2 text-lg font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
                                 </div>
-                            </div>
 
-                            <div className="pt-2 border-t mt-4">
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="font-semibold text-gray-600">Total</span>
-                                    <span className="font-black text-xl">${(tradeConfig.quantity * tradeConfig.price).toFixed(2)}</span>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Strike Price ($)</label>
+                                    <input
+                                        type="number"
+                                        value={tradeConfig.price}
+                                        onChange={(e) => setTradeConfig({ ...tradeConfig, price: e.target.value })}
+                                        className="w-full border rounded-lg px-3 py-2 text-lg font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                    <div className="text-xs text-gray-400 mt-1 flex justify-between">
+                                        <span>Market: ${parseFloat(selectedCommodity?.price || 0).toFixed(2)}</span>
+                                        <span onClick={() => setTradeConfig({ ...tradeConfig, price: parseFloat(selectedCommodity?.price).toFixed(2) })} className="text-blue-500 cursor-pointer hover:underline">Reset</span>
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={executeTrade}
-                                    className={`w-full py-3 rounded-lg font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95
+
+                                <div className="pt-2 border-t mt-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="font-semibold text-gray-600">Total</span>
+                                        <span className="font-black text-xl">${(tradeConfig.quantity * tradeConfig.price).toFixed(2)}</span>
+                                    </div>
+                                    <button
+                                        onClick={executeTrade}
+                                        className={`w-full py-3 rounded-lg font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95
                                         ${tradeConfig.action === 'BUY' ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-red-600 hover:bg-red-700 shadow-red-200'}`}
-                                >
-                                    CONFIRM ORDER
-                                </button>
+                                    >
+                                        CONFIRM ORDER
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 
