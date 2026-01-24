@@ -131,6 +131,7 @@ class AnalyticsEngine:
         Returns: Strong Buy, Buy, Hold, Sell, Strong Sell
         """
         from app.services.data_engine import data_engine
+        from app.services.fred import fred_service
         symbol = data.get('symbol', 'AAPL') 
         current_price = data.get('price', 0.0)
         
@@ -174,14 +175,28 @@ class AnalyticsEngine:
                 ti_score -= 10
                 ti_signals.append("Trend: Below SMA20 (Bearish)")
 
-        # 3. Weighted Confidence
-        # 60% News, 40% Technicals. Technically we normalize TI to a 0-100 scale or just add/subtract.
-        # Let's use: final_score = (news_score * 0.6) + ((ti_score + 30) * (100/60) * 0.4)
-        # Simplified: final_score = news_score + ti_score
-        confidence = news_score + ti_score
+        # 3. Macroeconomic Correlations (Base: 0, Range: -10 to +10)
+        dxy = await fred_service.get_dollar_index()
+        macro_score = 0
+        macro_signal = "Neutral"
+        
+        if dxy:
+            # DXY > 105 is generally considered strong USD (Bearish for Commodities priced in USD)
+            if dxy > 105:
+                macro_score = -10
+                macro_signal = f"Headwind: Strong Dollar (Index: {dxy:.1f})"
+            elif dxy < 100:
+                macro_score = 10
+                macro_signal = f"Tailwind: Weak Dollar (Index: {dxy:.1f})"
+            else:
+                macro_signal = "Stable Dollar Index"
+
+        # 4. Weighted Confidence
+        # 50% News, 35% Technicals, 15% Macro
+        confidence = news_score + ti_score + macro_score
         confidence = max(0, min(100, confidence)) # Clamp
         
-        # 4. Determine Action based on Confidence
+        # 5. Determine Action based on Confidence
         if confidence >= 80: action = "Strong Buy"
         elif confidence >= 60: action = "Buy"
         elif confidence >= 40: action = "Hold"
@@ -216,6 +231,10 @@ class AnalyticsEngine:
                 "rsi": round(rsi, 1),
                 "sma": round(sma, 2) if sma else None,
                 "signals": ti_signals
+            },
+            "macro": {
+                "dxy": round(dxy, 2) if dxy else None,
+                "signal": macro_signal
             },
             "analysis": {
                 "positives": sentiment['positives'][:3] if sentiment['positives'] else [],

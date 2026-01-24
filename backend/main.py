@@ -121,6 +121,7 @@ async def get_commodities(db = Depends(get_db)):
                 "reason": analysis['reason'],
                 "analysis": analysis['analysis'],
                 "indicators": analysis.get('indicators'),
+                "macro": analysis.get('macro'),
                 "risk": risk_data,
                 "polls": analysis.get('polls', [])
             }

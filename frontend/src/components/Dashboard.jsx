@@ -256,13 +256,14 @@ const Dashboard = () => {
 
             {/* MARKET TAB */}
             {activeTab === 'market' && (
-                <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-24">
+                <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-200px)] min-h-[600px]">
+                    {/* LEFT: Master List */}
+                    <div className="lg:w-[350px] flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
                         {commodities.map((item) => (
                             <div
                                 key={item.symbol}
-                                className={`border rounded-xl p-6 shadow-sm hover:shadow-lg transition-all cursor-pointer bg-white relative overflow-hidden group
-                                    ${selectedCommodity?.symbol === item.symbol ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'border-gray-200'}`}
+                                className={`border rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer bg-white relative overflow-hidden group shrink-0
+                                    ${selectedCommodity?.symbol === item.symbol ? 'ring-2 ring-blue-500 border-transparent shadow-md' : 'border-gray-200 hover:border-blue-200'}`}
                                 onClick={() => setSelectedCommodity(item)}
                             >
                                 <button
@@ -270,250 +271,256 @@ const Dashboard = () => {
                                     className="absolute top-2 right-2 p-1 text-gray-300 hover:text-red-500 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                                     title="Remove from watchlist"
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                     </svg>
                                 </button>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-gray-800">{item.symbol}</h2>
-                                        <p className="text-sm text-gray-600 font-medium">{item.name}</p>
+
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-xl font-bold text-gray-800">{item.symbol}</h2>
+                                        <div className={`w-2 h-2 rounded-full ${item.recommendation.action.includes('Buy') ? 'bg-green-500' :
+                                            item.recommendation.action.includes('Sell') ? 'bg-red-500' : 'bg-gray-400'}`}></div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-2xl font-mono font-medium">${parseFloat(item.price || 0).toFixed(2)}</div>
-                                        <div className={`text-sm font-bold ${item.risk.level === 'Low' ? 'text-green-600' :
-                                            item.risk.level === 'Medium' ? 'text-yellow-600' : 'text-red-600'
-                                            }`}>
-                                            {item.risk.level} Risk
-                                        </div>
-                                    </div>
+                                    <div className="text-lg font-mono font-medium">${parseFloat(item.price || 0).toFixed(2)}</div>
                                 </div>
 
-                                {/* Indicators & Recommendation */}
-                                <div className="mb-4 space-y-3">
-                                    <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Signal</span>
-                                            <span className={`text-sm font-bold ${item.recommendation.action.includes('Buy') ? 'text-green-600' :
-                                                item.recommendation.action.includes('Sell') ? 'text-red-600' : 'text-gray-500'}`}>
-                                                {item.recommendation.action}
-                                            </span>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-xs font-bold text-gray-400">{item.recommendation.confidence}% Conf.</div>
-                                            <div className="w-16 h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
-                                                <div
-                                                    className={`h-full transition-all duration-500 ${item.recommendation.confidence > 70 ? 'bg-green-500' :
-                                                        item.recommendation.confidence > 40 ? 'bg-yellow-500' : 'bg-red-500'
-                                                        }`}
-                                                    style={{ width: `${item.recommendation.confidence}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* New Technical Indicators Row */}
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 bg-blue-50/50 rounded-lg p-2 text-center">
-                                            <div className="text-[10px] font-bold text-blue-400 uppercase">RSI</div>
-                                            <div className={`text-sm font-mono font-bold ${item.recommendation.indicators?.rsi < 35 ? 'text-green-600' :
-                                                item.recommendation.indicators?.rsi > 65 ? 'text-red-600' : 'text-blue-600'
-                                                }`}>
-                                                {item.recommendation.indicators?.rsi || '-'}
-                                            </div>
-                                        </div>
-                                        <div className="flex-1 bg-purple-50/50 rounded-lg p-2 text-center">
-                                            <div className="text-[10px] font-bold text-purple-400 uppercase">Trend</div>
-                                            <div className="text-sm font-bold text-purple-600">
-                                                {item.recommendation.indicators?.signals?.some(s => s.includes('Above SMA')) ? 'Bullish' :
-                                                    item.recommendation.indicators?.signals?.some(s => s.includes('Below SMA')) ? 'Bearish' : 'Neutral'}
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div className="flex justify-between items-center mb-3">
+                                    <span className="text-xs text-gray-500 font-medium truncate max-w-[120px]">{item.name}</span>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.risk.level === 'Low' ? 'bg-green-100 text-green-700' :
+                                        item.risk.level === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                        {item.risk.level}
+                                    </span>
                                 </div>
 
-                                {/* Quick Analysis Preview (First bullet) */}
-                                {item.recommendation.analysis?.positives?.[0] && (
-                                    <div className="text-xs text-gray-500 flex items-start gap-2 border-t border-gray-50 pt-3">
-                                        <span className="text-green-500 font-bold">↑</span>
-                                        <span className="truncate italic">"{item.recommendation.analysis.positives[0].text}"</span>
+                                <div className="grid grid-cols-2 gap-2 text-center border-t border-gray-50 pt-3">
+                                    <div className="bg-blue-50/50 rounded p-1.5 flex flex-col justify-center">
+                                        <span className="text-[8px] font-bold text-blue-400 uppercase">RSI</span>
+                                        <span className="text-xs font-mono font-bold leading-none">{item.recommendation.indicators?.rsi || '-'}</span>
                                     </div>
-                                )}
+                                    <div className="bg-purple-50/50 rounded p-1.5 flex flex-col justify-center">
+                                        <span className="text-[8px] font-bold text-purple-400 uppercase">Trend</span>
+                                        <span className="text-[10px] font-bold leading-none truncate italic">
+                                            {item.recommendation.indicators?.signals?.some(s => s.includes('Above SMA')) ? 'Bullish' :
+                                                item.recommendation.indicators?.signals?.some(s => s.includes('Below SMA')) ? 'Bearish' : 'Neutral'}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
 
-                    {/* DETAIL PANEL */}
-                    {selectedCommodity && (
-                        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-100 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-6 z-50 animate-slide-up">
-                            <button
-                                onClick={() => setSelectedCommodity(null)}
-                                className="absolute top-4 right-4 text-gray-400 hover:text-black p-2 rounded-full hover:bg-gray-100 transition-colors z-[60]"
-                                title="Close details"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                            <div className="container mx-auto flex flex-col lg:flex-row gap-8 max-w-7xl">
-                                {/* Left: Action */}
-                                <div className="lg:w-1/4 flex flex-col justify-between border-r pr-6">
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h2 className="text-3xl font-bold text-gray-900">{selectedCommodity.symbol} <span className="text-lg font-normal text-gray-500 ml-2">{selectedCommodity.name}</span></h2>
-                                            <span className="text-2xl font-mono">${parseFloat(selectedCommodity.price || 0).toFixed(2)}</span>
-                                        </div>
+                    {/* RIGHT: Detail Viewer */}
+                    <div className="flex-1 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+                        {selectedCommodity ? (
+                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
+                                <button
+                                    onClick={() => setSelectedCommodity(null)}
+                                    className="absolute top-6 right-6 text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-gray-100 transition-colors z-10"
+                                    title="Close details"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
 
-                                        <div className="mb-6">
-                                            <div className="text-sm text-gray-500 mb-1 flex justify-between items-center">
-                                                <span>Confidence Score</span>
-                                                <span className="text-xs font-bold text-gray-400">{selectedCommodity.recommendation.reason}</span>
+                                <div className="flex flex-col gap-8">
+                                    {/* Header Section */}
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">{selectedCommodity.symbol}</h2>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
+                                                    ${selectedCommodity.risk.level === 'Low' ? 'bg-green-100 text-green-700' :
+                                                        selectedCommodity.risk.level === 'Medium' ? 'bg-yellow-102 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {selectedCommodity.risk.level} Risk
+                                                </span>
                                             </div>
-                                            <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full transition-all duration-500 ${selectedCommodity.recommendation.confidence > 60 ? 'bg-green-500' : 'bg-yellow-500'
-                                                        }`}
-                                                    style={{ width: `${selectedCommodity.recommendation.confidence}%` }}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <div className="text-[10px] font-bold text-red-400 uppercase">
-                                                    Vol: {selectedCommodity.recommendation.risk?.volatility || 0}% (Daily)
+                                            <p className="text-gray-500 font-medium text-lg">{selectedCommodity.name}</p>
+                                        </div>
+                                        <div className="text-right mt-4 md:mt-0">
+                                            <div className="text-4xl font-mono font-bold text-gray-900">${parseFloat(selectedCommodity.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                            <div className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">Real-time Price</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                                        {/* Left Col: Recommendation & Trade */}
+                                        <div className="xl:col-span-1 border-r border-gray-100 pr-0 xl:pr-8 flex flex-col gap-6">
+                                            <div>
+                                                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Recommendation Signal</div>
+                                                <div className={`text-3xl font-black mb-4 ${selectedCommodity.recommendation.action.includes('Buy') ? 'text-green-600' :
+                                                    selectedCommodity.recommendation.action.includes('Sell') ? 'text-red-600' : 'text-gray-500'}`}>
+                                                    {selectedCommodity.recommendation.action}
                                                 </div>
-                                                <div className="text-right text-xs font-bold">{selectedCommodity.recommendation.confidence}%</div>
-                                            </div>
-                                        </div>
 
-                                        {/* Technical Signals in Detail Panel */}
-                                        {selectedCommodity.recommendation.indicators?.signals && (
-                                            <div className="mb-6 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                                <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2">Technical Signals</h4>
-                                                <div className="space-y-1">
-                                                    {selectedCommodity.recommendation.indicators.signals.map((sig, i) => (
-                                                        <div key={i} className="text-xs font-medium text-gray-700 flex items-center gap-2">
-                                                            <span className="w-1 h-1 bg-blue-400 rounded-full"></span>
-                                                            {sig}
+                                                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <span className="text-sm font-bold text-gray-500 uppercase">AI Confidence</span>
+                                                        <span className="text-lg font-bold text-gray-900">{selectedCommodity.recommendation.confidence}%</span>
+                                                    </div>
+                                                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
+                                                        <div
+                                                            className={`h-full transition-all duration-700 rounded-full ${selectedCommodity.recommendation.confidence > 70 ? 'bg-green-500 shadowing-lg' :
+                                                                selectedCommodity.recommendation.confidence > 40 ? 'bg-yellow-500 shadow-md' : 'bg-red-500'}`}
+                                                            style={{ width: `${selectedCommodity.recommendation.confidence}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="text-[10px] italic text-gray-400">{selectedCommodity.recommendation.reason}</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Volatility</span>
+                                                    <span className="text-base font-bold text-red-500">{selectedCommodity.recommendation.risk?.volatility || 0}%</span>
+                                                </div>
+                                                {selectedCommodity.recommendation.macro && (
+                                                    <div className="flex flex-col border-l pl-3">
+                                                        <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Macro Bias</span>
+                                                        <span className={`text-[11px] font-bold ${selectedCommodity.recommendation.macro.signal.includes('Tailwind') ? 'text-green-500' : 'text-red-500'}`}>
+                                                            {selectedCommodity.recommendation.macro.signal.split(':')[0]}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Portfolio Position */}
+                                            {(() => {
+                                                const myHolding = holdings.find(h => h.symbol === selectedCommodity.symbol);
+                                                if (myHolding) {
+                                                    const diff = selectedCommodity.price - myHolding.avg_price;
+                                                    const diffPercent = (diff / myHolding.avg_price) * 100;
+                                                    const isPositive = diff >= 0;
+                                                    return (
+                                                        <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-xl shadow-blue-100">
+                                                            <div className="flex justify-between items-start mb-4">
+                                                                <h4 className="text-xs font-bold uppercase tracking-widest text-blue-200">Portfolio Status</h4>
+                                                                <div className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Active Position</div>
+                                                            </div>
+                                                            <div className="flex justify-between items-end mb-2">
+                                                                <span className="text-2xl font-bold">Qty: {myHolding.quantity}</span>
+                                                                <span className="text-2xl font-black">{isPositive ? '+' : ''}{diffPercent.toFixed(2)}%</span>
+                                                            </div>
+                                                            <div className="text-xs text-blue-200 font-medium">Average Price: ${myHolding.avg_price.toFixed(2)}</div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Holding Info in Detail Panel */}
-                                        {(() => {
-                                            const myHolding = holdings.find(h => h.symbol === selectedCommodity.symbol);
-                                            if (myHolding) {
-                                                const diff = selectedCommodity.price - myHolding.avg_price;
-                                                const diffPercent = (diff / myHolding.avg_price) * 100;
-                                                const isPositive = diff >= 0;
+                                                    );
+                                                }
                                                 return (
-                                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
-                                                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Your Position</h4>
-                                                        <div className="flex justify-between items-end mb-1">
-                                                            <span className="text-gray-700 font-medium">Qty: {myHolding.quantity}</span>
-                                                            <span className={`font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                                                {isPositive ? '+' : ''}{diffPercent.toFixed(2)}%
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-gray-500">
-                                                            Avg: ${myHolding.avg_price.toFixed(2)}
-                                                        </div>
+                                                    <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl p-5 text-center flex flex-col items-center justify-center gap-2">
+                                                        <span className="text-gray-400 text-xl opacity-50">📁</span>
+                                                        <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">No active position</span>
                                                     </div>
                                                 );
-                                            }
-                                            return null;
-                                        })()}
-                                    </div>
+                                            })()}
 
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => openTradeModal('BUY')}
-                                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-green-200 transition-all"
-                                        >
-                                            BUY
-                                        </button>
-                                        <button
-                                            onClick={() => openTradeModal('SELL')}
-                                            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-red-200 transition-all"
-                                        >
-                                            SELL
-                                        </button>
-                                    </div>
-                                </div>
+                                            <div className="flex gap-3 mt-auto pt-4">
+                                                <button
+                                                    onClick={() => openTradeModal('BUY')}
+                                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black shadow-lg shadow-green-100 transition-all uppercase tracking-widest"
+                                                >
+                                                    BUY
+                                                </button>
+                                                <button
+                                                    onClick={() => openTradeModal('SELL')}
+                                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black shadow-lg shadow-red-100 transition-all uppercase tracking-widest"
+                                                >
+                                                    SELL
+                                                </button>
+                                            </div>
+                                        </div>
 
-                                {/* Middle: Analysis */}
-                                <div className="lg:w-1/2 flex flex-col md:flex-row gap-6">
-                                    <div className="flex-1 bg-green-50 rounded-xl p-4 border border-green-100">
-                                        <h3 className="font-bold text-green-800 mb-3 flex items-center gap-2">
-                                            <span className="bg-green-200 rounded p-1">👍</span> Positives
-                                        </h3>
-                                        <ul className="space-y-3">
-                                            {selectedCommodity.recommendation.analysis?.positives?.map((p, i) => (
-                                                <li key={i} className="text-sm text-green-900 flex items-start gap-2">
-                                                    <span className="mt-1">•</span>
-                                                    <div>
-                                                        <div>{p.text}</div>
-                                                        <div className="text-xs text-green-600 font-semibold mt-0.5">— {p.source}</div>
-                                                    </div>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-
-                                    <div className="flex-1 bg-red-50 rounded-xl p-4 border border-red-100">
-                                        <h3 className="font-bold text-red-800 mb-3 flex items-center gap-2">
-                                            <span className="bg-red-200 rounded p-1">👎</span> Negatives
-                                        </h3>
-                                        <ul className="space-y-3">
-                                            {selectedCommodity.recommendation.analysis?.negatives?.map((n, i) => (
-                                                <li key={i} className="text-sm text-red-900 flex items-start gap-2">
-                                                    <span className="mt-1">•</span>
-                                                    <div>
-                                                        <div>{n.text}</div>
-                                                        <div className="text-xs text-red-600 font-semibold mt-0.5">— {n.source}</div>
-                                                    </div>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                {/* Right: Polymarket Polls */}
-                                <div className="lg:w-1/4 border-l pl-6 overflow-y-auto max-h-[400px]">
-                                    <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                        <span className="text-blue-500">📊</span> Top Predictions
-                                    </h3>
-
-                                    <div className="space-y-4">
-                                        {selectedCommodity.recommendation.polls?.length > 0 ? (
-                                            selectedCommodity.recommendation.polls.map((poll, idx) => (
-                                                <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100 hover:border-blue-200 transition-colors">
-                                                    <p className="text-sm font-medium text-gray-800 mb-2 leading-tight">{poll.question}</p>
-
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden flex">
-                                                            <div className="bg-green-500 h-full" style={{ width: `${poll.yes}%` }} />
-                                                            <div className="bg-red-500 h-full" style={{ width: `${poll.no}%` }} />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex justify-between text-xs font-bold">
-                                                        <span className="text-green-600">Yes {poll.yes}%</span>
-                                                        <span className="text-red-600">No {poll.no}%</span>
+                                        {/* Center Col: Signals & News */}
+                                        <div className="xl:col-span-2 flex flex-col gap-6">
+                                            {/* Indicators Summary */}
+                                            {selectedCommodity.recommendation.indicators?.signals && (
+                                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Live Technical Signals</h3>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {selectedCommodity.recommendation.indicators.signals.map((sig, i) => (
+                                                            <span key={i} className="bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 flex items-center gap-2">
+                                                                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                                                                {sig}
+                                                            </span>
+                                                        ))}
                                                     </div>
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <div className="text-sm text-gray-500 italic p-4 text-center">
-                                                No relevant polls found for this commodity.
+                                            )}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="bg-green-50/50 rounded-2xl p-6 border border-green-100">
+                                                    <h3 className="font-bold text-green-800 mb-4 flex items-center gap-2 uppercase text-xs tracking-widest">
+                                                        <span className="bg-green-100 rounded p-1.5">👍</span> Bullish Factors
+                                                    </h3>
+                                                    <ul className="space-y-4">
+                                                        {selectedCommodity.recommendation.analysis?.positives?.map((p, i) => (
+                                                            <li key={i} className="text-sm text-green-900 group">
+                                                                <div className="font-bold mb-1 leading-snug group-hover:text-green-700 transition-colors">"{p.text}"</div>
+                                                                <div className="text-[10px] text-green-600 font-bold uppercase tracking-tighter opacity-70">— Source: {p.source}</div>
+                                                            </li>
+                                                        ))}
+                                                        {(!selectedCommodity.recommendation.analysis?.positives || selectedCommodity.recommendation.analysis.positives.length === 0) && (
+                                                            <div className="text-xs text-green-600 italic">No significant bullish indicators detected.</div>
+                                                        )}
+                                                    </ul>
+                                                </div>
+
+                                                <div className="bg-red-50/50 rounded-2xl p-6 border border-red-100">
+                                                    <h3 className="font-bold text-red-800 mb-4 flex items-center gap-2 uppercase text-xs tracking-widest">
+                                                        <span className="bg-red-100 rounded p-1.5">👎</span> Bearish Factors
+                                                    </h3>
+                                                    <ul className="space-y-4">
+                                                        {selectedCommodity.recommendation.analysis?.negatives?.map((n, i) => (
+                                                            <li key={i} className="text-sm text-red-900 group">
+                                                                <div className="font-bold mb-1 leading-snug group-hover:text-red-700 transition-colors">"{n.text}"</div>
+                                                                <div className="text-[10px] text-red-600 font-bold uppercase tracking-tighter opacity-70">— Source: {n.source}</div>
+                                                            </li>
+                                                        ))}
+                                                        {(!selectedCommodity.recommendation.analysis?.negatives || selectedCommodity.recommendation.analysis.negatives.length === 0) && (
+                                                            <div className="text-xs text-red-600 italic">No significant bearish indicators detected.</div>
+                                                        )}
+                                                    </ul>
+                                                </div>
                                             </div>
-                                        )}
+
+                                            {/* Prediction Markets (Polymarket) */}
+                                            {selectedCommodity.recommendation.polls?.length > 0 && (
+                                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                                        <span className="text-lg">📊</span> Prediction Market Insights
+                                                    </h3>
+                                                    <div className="space-y-5">
+                                                        {selectedCommodity.recommendation.polls.map((poll, i) => (
+                                                            <div key={i} className="flex flex-col gap-2">
+                                                                <div className="text-sm font-bold text-gray-800">{poll.question}</div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden flex">
+                                                                        <div className="h-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]" style={{ width: `${poll.yes}%` }} />
+                                                                        <div className="h-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.3)]" style={{ width: `${poll.no}%` }} />
+                                                                    </div>
+                                                                    <div className="flex gap-2 text-[10px] font-black uppercase">
+                                                                        <span className="text-green-600">Yes {poll.yes}%</span>
+                                                                        <span className="text-red-500">No {poll.no}%</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
-                </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 opacity-60 p-12 text-center animate-pulse">
+                                <div className="text-6xl mb-6">🔭</div>
+                                <h3 className="text-2xl font-bold mb-2">Market Overview Selective</h3>
+                                <p className="text-sm font-medium max-w-xs">Select any commodity from the left panel to display deep AI analysis and market insights.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* HOLDINGS TAB */}

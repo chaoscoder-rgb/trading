@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     FINNHUB_API_KEY: str = ""
     FINNHUB_BASE_URL: str = "https://finnhub.io/api/v1"
     
+    # FRED (Macro Data)
+    FRED_API_KEY: str = ""
+    FRED_BASE_URL: str = "https://api.stlouisfed.org/fred"
+    
     # Email
     EMAIL_SENDER: str = ""
     EMAIL_PASSWORD: str = ""
