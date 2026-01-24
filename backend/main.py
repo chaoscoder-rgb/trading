@@ -103,14 +103,9 @@ async def get_commodities(db = Depends(get_db)):
         # Calculate Risk (Simple/Mock if needed, or use analysis)
         # Frontend expects risk.level
         
-        # Calculate Dynamic Risk based on Confidence
-        confidence_score = analysis.get('confidence', 0.0)
-        if confidence_score > 80:
-            risk_level = "Low"
-        elif confidence_score > 50:
-            risk_level = "Medium"
-        else:
-            risk_level = "High"
+        # Use Real Risk from analysis (Volatility-based)
+        risk_data = analysis.get('risk', {"level": "Medium", "volatility": 0.0})
+        risk_level = risk_data.get('level', "Medium")
 
         results.append({
             "id": symbol,
@@ -119,13 +114,14 @@ async def get_commodities(db = Depends(get_db)):
             "price": data.get('price', 0.0),
             "change": data.get('change', 0.0),
             "changePercent": data.get('change_percent', 0.0),
-            "risk": {"level": risk_level},
+            "risk": risk_data,
             "recommendation": {
                 "action": analysis['action'],
                 "confidence": analysis['confidence'],
                 "reason": analysis['reason'],
                 "analysis": analysis['analysis'],
                 "indicators": analysis.get('indicators'),
+                "risk": risk_data,
                 "polls": analysis.get('polls', [])
             }
         })

@@ -123,6 +123,63 @@ class DataEngine:
             "sma_sim_signal": sma_signal # Internal hint for analytics
         }
 
+    def _simulate_history(self, symbol, days):
+        import random
+        # Base volatility factor per symbol for more interesting UI
+        VOL_MAP = {
+            "GC": 0.005,  # Low volatility (Gold)
+            "SI": 0.015,  # Med
+            "CL": 0.025,  # High (Oil)
+            "HG": 0.012,
+            "NG": 0.040   # Very High (Nat Gas)
+        }
+        v_factor = VOL_MAP.get(symbol, 0.02)
+        
+        base = 100.0
+        prices = []
+        curr = base
+        for _ in range(days):
+            curr = curr * (1 + random.uniform(-v_factor, v_factor))
+            prices.append(curr)
+        return prices
+
+    async def get_historical_prices(self, symbol: str, days: int = 30):
+        """
+        Fetch historical daily closes for volatility calculation.
+        """
+        SYMBOL_MAP = {
+            "GC": "XAU/USD",
+            "SI": "XAG/USD",
+            "CL": "WTI/USD",
+            "HG": "XCU/USD",
+            "NG": "XNG/USD"
+        }
+        api_symbol = SYMBOL_MAP.get(symbol, symbol)
+
+        if not self.API_KEY:
+            return self._simulate_history(symbol, days)
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.BASE_URL}/time_series",
+                    params={
+                        "symbol": api_symbol,
+                        "interval": "1day",
+                        "outputsize": days,
+                        "apikey": self.API_KEY
+                    }
+                )
+                data = response.json()
+                if "values" in data:
+                    return [float(v["close"]) for v in data["values"]]
+                
+                print(f"History API Error for {symbol}: {data.get('message')}")
+                return self._simulate_history(symbol, days)
+            except Exception as e:
+                print(f"Error fetching history for {symbol}: {e}")
+                return self._simulate_history(symbol, days)
+
     async def search_symbols(self, query: str):
         """
         Search for available symbols using TwelveData API.

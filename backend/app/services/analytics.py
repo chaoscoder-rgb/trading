@@ -9,18 +9,41 @@ class AnalyticsEngine:
         self.finnhub_url = settings.FINNHUB_BASE_URL
         self.api_key = settings.FINNHUB_API_KEY
 
-    def calculate_risk(self, data: dict) -> dict:
+    async def calculate_risk_v2(self, symbol: str) -> dict:
         """
-        Calculate risk based on volatility/market data.
-        Returns: Very High, High, Medium, Low
+        Calculate risk based on 30-day historical volatility.
         """
-        # Placeholder risk logic - in a real app this would use volatility from TwelveData
-        risks = ["Very High", "High", "Medium", "Low"]
-        risk = random.choice(risks)
+        from app.services.data_engine import data_engine
+        prices = await data_engine.get_historical_prices(symbol, days=30)
+        
+        if len(prices) < 2:
+            return {"level": "Medium", "volatility": 0.0, "reason": "Insufficient data"}
+
+        # Calculate daily returns
+        import math
+        returns = []
+        for i in range(len(prices)-1):
+            # Using simple percentage returns
+            ret = (prices[i] - prices[i+1]) / prices[i+1]
+            returns.append(ret)
+            
+        # Standard Deviation
+        mean = sum(returns) / len(returns)
+        variance = sum((r - mean)**2 for r in returns) / len(returns)
+        std_dev = math.sqrt(variance)
+        
+        # Daily volatility in %
+        vol = std_dev * 100
+        
+        # Adjusted thresholds for more variety in typical market conditions
+        if vol < 1.0: level = "Low"
+        elif vol < 2.0: level = "Medium"
+        else: level = "High"
+        
         return {
-            "level": risk,
-            "score": random.uniform(0, 100),
-            "reason": "Market volatility analysis (MVP Placeholder)"
+            "level": level,
+            "volatility": round(vol, 2),
+            "reason": f"Historical 30-day volatility is {vol:.2f}%"
         }
 
     async def fetch_news(self, symbol: str) -> list:
@@ -202,12 +225,14 @@ class AnalyticsEngine:
 
     async def generate_enhanced_recommendation(self, data: dict, symbol: str) -> dict:
         # Get base recommendation
-        # Note: data now passed to generate_recommendation should ideally contain symbol info
-        # We patch the data dict to ensure symbol is present for fetch_news
         data['symbol'] = symbol
         rec = await self.generate_recommendation(data)
         
-        # Fetch Polymarket Data
+        # 1. Fetch Real Risk based on Volatility
+        risk_data = await self.calculate_risk_v2(symbol)
+        rec["risk"] = risk_data
+        
+        # 2. Fetch Polymarket Data
         try:
             from app.services.polymarket import polymarket_service
             polls = await polymarket_service.get_related_markets(symbol)

@@ -376,7 +376,12 @@ const Dashboard = () => {
                                                     style={{ width: `${selectedCommodity.recommendation.confidence}%` }}
                                                 />
                                             </div>
-                                            <div className="text-right text-xs font-bold mt-1">{selectedCommodity.recommendation.confidence}%</div>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <div className="text-[10px] font-bold text-red-400 uppercase">
+                                                    Vol: {selectedCommodity.recommendation.risk?.volatility || 0}% (Daily)
+                                                </div>
+                                                <div className="text-right text-xs font-bold">{selectedCommodity.recommendation.confidence}%</div>
+                                            </div>
                                         </div>
 
                                         {/* Technical Signals in Detail Panel */}
