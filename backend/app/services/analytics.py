@@ -175,32 +175,71 @@ class AnalyticsEngine:
                 ti_score -= 10
                 ti_signals.append("Trend: Below SMA20 (Bearish)")
 
-        # 3. Macroeconomic Correlations (Base: 0, Range: -10 to +10)
-        dxy = await fred_service.get_dollar_index()
-        macro_score = 0
-        macro_signal = "Neutral"
+        # 3. Smart Money & Political Sentiment (Base: 0, Range: -15 to +15)
+        from app.services.insider import insider_service
+        insider_tx = await insider_service.get_insider_transactions(symbol)
+        congress_tx = await insider_service.get_congress_trading(symbol)
         
-        if dxy:
-            # DXY > 105 is generally considered strong USD (Bearish for Commodities priced in USD)
-            if dxy > 105:
-                macro_score = -10
-                macro_signal = f"Headwind: Strong Dollar (Index: {dxy:.1f})"
-            elif dxy < 100:
-                macro_score = 10
-                macro_signal = f"Tailwind: Weak Dollar (Index: {dxy:.1f})"
-            else:
-                macro_signal = "Stable Dollar Index"
+        insider_score, insider_status = insider_service.analyze_insider_sentiment(insider_tx)
+        
+        # Political Signal (Congessional) - Simplified detection
+        political_score = 0
+        political_signal = "Neutral"
+        if congress_tx:
+            # Finnhub returns a list of trades
+            recent_trades = congress_tx[:5]
+            buys = [t for t in recent_trades if t.get('transactionType') == 'Purchase']
+            sells = [t for t in recent_trades if t.get('transactionType') == 'Sale']
+            if len(buys) > len(sells):
+                political_score = 8
+                political_signal = f"Bullish Political Flow ({len(buys)} trades)"
+            elif len(sells) > len(buys):
+                political_score = -8
+                political_signal = f"Bearish Political Flow ({len(sells)} trades)"
 
-        # 4. Weighted Confidence
-        # 50% News, 35% Technicals, 15% Macro
-        confidence = news_score + ti_score + macro_score
+        # 4. Macroeconomic Correlations (Base: 0, Range: -15 to +15)
+        dxy = await fred_service.get_dollar_index()
+        yield_10y = await fred_service.get_10y_yield()
+        fed_rate = await fred_service.get_fed_funds_rate()
+
+        macro_score = 0
+        macro_signals = []
+        
+        # DXY Impact
+        if dxy:
+            if dxy > 105:
+                macro_score -= 5
+                macro_signals.append("Headwind: Strong Dollar")
+            elif dxy < 100:
+                macro_score += 5
+                macro_signals.append("Tailwind: Weak Dollar")
+
+        # Interest Rate Impact
+        if fed_rate and fed_rate > 5.0:
+            macro_score -= 5
+            macro_signals.append("Headwind: High Interest Rates")
+        
+        # 10Y Yield Impact (Specific to Metals)
+        if yield_10y and symbol in ["GC", "SI"]:
+            if yield_10y > 4.0:
+                macro_score -= 5
+                macro_signals.append("Headwind: Rising Yields (Bearish for Metals)")
+            elif yield_10y < 3.5:
+                macro_score += 5
+                macro_signals.append("Tailwind: Falling Yields (Bullish for Metals)")
+
+        macro_status = " / ".join(macro_signals) if macro_signals else "Macro Neutral"
+
+        # 5. Weighted Confidence (Dynamic Weights based on data availability)
+        # Weights: News 35%, Technicals 30%, Macro 20%, Smart Money 15%
+        confidence = news_score + ti_score + macro_score + insider_score + political_score
         confidence = max(0, min(100, confidence)) # Clamp
         
-        # 5. Determine Action based on Confidence
+        # 6. Determine Action based on Confidence
         if confidence >= 80: action = "Strong Buy"
         elif confidence >= 60: action = "Buy"
         elif confidence >= 40: action = "Hold"
-        elif confidence >= 20: action = "Sell"
+        elif confidence >= 25: action = "Sell"
         else: action = "Strong Sell"
 
         # 5. Fallback if no news OR no meaningful sentiment extracted
@@ -234,7 +273,15 @@ class AnalyticsEngine:
             },
             "macro": {
                 "dxy": round(dxy, 2) if dxy else None,
-                "signal": macro_signal
+                "yield_10y": round(yield_10y, 2) if yield_10y else None,
+                "fed_rate": round(fed_rate, 2) if fed_rate else None,
+                "signal": macro_status
+            },
+            "unusual_flow": {
+                "insider_status": insider_status,
+                "political_status": political_signal,
+                "insider_trades": insider_tx[:3],
+                "political_trades": congress_tx[:3] if congress_tx else []
             },
             "analysis": {
                 "positives": sentiment['positives'][:3] if sentiment['positives'] else [],

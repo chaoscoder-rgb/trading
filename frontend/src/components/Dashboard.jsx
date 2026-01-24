@@ -376,11 +376,16 @@ const Dashboard = () => {
                                                     <span className="text-base font-bold text-red-500">{selectedCommodity.recommendation.risk?.volatility || 0}%</span>
                                                 </div>
                                                 {selectedCommodity.recommendation.macro && (
-                                                    <div className="flex flex-col border-l pl-3">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase mb-1">Macro Bias</span>
+                                                    <div className="flex flex-col border-l pl-3 gap-1">
+                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">Macro Bias</span>
                                                         <span className={`text-[11px] font-bold ${selectedCommodity.recommendation.macro.signal.includes('Tailwind') ? 'text-green-500' : 'text-red-500'}`}>
-                                                            {selectedCommodity.recommendation.macro.signal.split(':')[0]}
+                                                            {selectedCommodity.recommendation.macro.signal.split('/')[0]}
                                                         </span>
+                                                        <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 border-t border-gray-50 pt-1">
+                                                            <span className="text-[9px] font-bold text-gray-400">DXY: <span className="text-gray-600 font-mono">{selectedCommodity.recommendation.macro.dxy}</span></span>
+                                                            <span className="text-[9px] font-bold text-gray-400">10Y: <span className="text-gray-600 font-mono">{selectedCommodity.recommendation.macro.yield_10y}%</span></span>
+                                                            <span className="text-[9px] font-bold text-gray-400">IR: <span className="text-gray-600 font-mono">{selectedCommodity.recommendation.macro.fed_rate}%</span></span>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
@@ -482,6 +487,91 @@ const Dashboard = () => {
                                                     </ul>
                                                 </div>
                                             </div>
+
+                                            {/* Global Macro Climate */}
+                                            {selectedCommodity.recommendation.macro && (
+                                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                                        <span className="text-lg">🌍</span> Global Macro Climate
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                        <div className="flex flex-col gap-1 border-r border-gray-50 pr-4">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">US Dollar Index</span>
+                                                            <div className="text-2xl font-black text-gray-900">{selectedCommodity.recommendation.macro.dxy}</div>
+                                                            <div className="text-[10px] text-gray-500 font-medium">USD Strength Indicator</div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-1 border-r border-gray-50 pr-4">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">10Y Treasury Yield</span>
+                                                            <div className="text-2xl font-black text-blue-600">{selectedCommodity.recommendation.macro.yield_10y}%</div>
+                                                            <div className="text-[10px] text-gray-500 font-medium">Risk-Free Market Baseline</div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">Fed Funds Rate</span>
+                                                            <div className="text-2xl font-black text-purple-600">{selectedCommodity.recommendation.macro.fed_rate}%</div>
+                                                            <div className="text-[10px] text-gray-500 font-medium">Liquidity Benchmark</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold text-center text-gray-600 italic">
+                                                        "{selectedCommodity.recommendation.macro.signal}"
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Smart Money & Political Flow */}
+                                            {selectedCommodity.recommendation.unusual_flow && (
+                                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                                        <span className="text-lg">💼</span> Smart Money & Political Flow
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                        <div className="flex flex-col gap-3">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Insider Activity</span>
+                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${selectedCommodity.recommendation.unusual_flow.insider_status.includes('Buying') ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                                    {selectedCommodity.recommendation.unusual_flow.insider_status}
+                                                                </span>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {selectedCommodity.recommendation.unusual_flow.insider_trades?.length > 0 ? (
+                                                                    selectedCommodity.recommendation.unusual_flow.insider_trades.map((tx, idx) => (
+                                                                        <div key={idx} className="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2">
+                                                                            <div className="font-bold text-gray-800">{tx.name || 'Officer'}</div>
+                                                                            <div className={tx.change > 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                                {tx.change > 0 ? '+' : ''}{tx.change?.toLocaleString()} shrs
+                                                                            </div>
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="text-[10px] text-gray-400 italic">No recent Form 4 filings.</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex flex-col gap-3">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Congressional Flow</span>
+                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${selectedCommodity.recommendation.unusual_flow.political_status.includes('Bullish') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                                    {selectedCommodity.recommendation.unusual_flow.political_status}
+                                                                </span>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {selectedCommodity.recommendation.unusual_flow.political_trades?.length > 0 ? (
+                                                                    selectedCommodity.recommendation.unusual_flow.political_trades.map((tx, idx) => (
+                                                                        <div key={idx} className="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2">
+                                                                            <div className="font-bold text-gray-800">{tx.representative || 'Official'}</div>
+                                                                            <div className={tx.transactionType === 'Purchase' ? 'text-green-600' : 'text-red-600'}>
+                                                                                {tx.transactionType}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="text-[10px] text-gray-400 italic">No recent political disclosures.</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             {/* Prediction Markets (Polymarket) */}
                                             {selectedCommodity.recommendation.polls?.length > 0 && (

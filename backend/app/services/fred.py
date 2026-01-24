@@ -37,11 +37,23 @@ class FredService:
         # DTWEXBGS is the Trade Weighted U.S. Dollar Index: Broad, Goods and Services
         return await self.get_series_latest("DTWEXBGS")
 
+    async def get_10y_yield(self):
+        # DGS10 is 10-Year Treasury Constant Maturity Rate
+        return await self.get_series_latest("DGS10")
+
+    async def get_fed_funds_rate(self):
+        # FEDFUNDS is Effective Federal Funds Rate
+        return await self.get_series_latest("FEDFUNDS")
+
     def _simulate_macro(self, series_id):
         import random
-        # Mock values for DXY related index
+        # Mock values for common FRED series
         if series_id == "DTWEXBGS":
             return 115.0 + random.uniform(-2, 2)
+        if series_id == "DGS10":
+            return 4.2 + random.uniform(-0.5, 0.5)
+        if series_id == "FEDFUNDS":
+            return 5.33
         return 5.0 + random.uniform(-1, 1)
 
 fred_service = FredService()

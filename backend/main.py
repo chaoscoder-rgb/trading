@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db import init_db, get_db
@@ -83,50 +84,53 @@ async def delete_commodity(symbol: str, db = Depends(get_db)):
 
 @app.get("/api/commodities")
 async def get_commodities(db = Depends(get_db)):
-    # Get all commodities
-    rs = await db.execute("SELECT symbol, name FROM commodities")
+    # Get all commodities, newest first
+    rs = await db.execute("SELECT symbol, name, id FROM commodities ORDER BY id DESC")
     
     # Map results to list of dicts. Note: rs.rows are tuples in libsql-client
-    # Adjusting index to 0,1 as checked in previous turn
     db_commodities = [{"symbol": row[0], "name": row[1]} for row in rs.rows]
     
-    results = []
-    for com in db_commodities:
+    async def process_commodity(com):
         symbol = com['symbol']
-        # Fetch Real-Time Data (or cache)
-        # Note: get_price might fail if no price is available yet
-        data = await data_engine.get_price(symbol) 
-        
-        # Analyze
-        analysis = await analytics_engine.generate_enhanced_recommendation(data, symbol)
-        
-        # Calculate Risk (Simple/Mock if needed, or use analysis)
-        # Frontend expects risk.level
-        
-        # Use Real Risk from analysis (Volatility-based)
-        risk_data = analysis.get('risk', {"level": "Medium", "volatility": 0.0})
-        risk_level = risk_data.get('level', "Medium")
-
-        results.append({
-            "id": symbol,
-            "symbol": symbol,
-            "name": com['name'],
-            "price": data.get('price', 0.0),
-            "change": data.get('change', 0.0),
-            "changePercent": data.get('change_percent', 0.0),
-            "risk": risk_data,
-            "recommendation": {
-                "action": analysis['action'],
-                "confidence": analysis['confidence'],
-                "reason": analysis['reason'],
-                "analysis": analysis['analysis'],
-                "indicators": analysis.get('indicators'),
-                "macro": analysis.get('macro'),
+        try:
+            # Fetch Real-Time Data (or cache)
+            data = await data_engine.get_price(symbol) 
+            
+            # Analyze
+            analysis = await analytics_engine.generate_enhanced_recommendation(data, symbol)
+            
+            risk_data = analysis.get('risk', {"level": "Medium", "volatility": 0.0})
+            
+            return {
+                "id": symbol,
+                "symbol": symbol,
+                "name": com['name'],
+                "price": data.get('price', 0.0),
+                "change": data.get('change', 0.0),
+                "changePercent": data.get('change_percent', 0.0),
                 "risk": risk_data,
-                "polls": analysis.get('polls', [])
+                "recommendation": {
+                    "action": analysis['action'],
+                    "confidence": analysis['confidence'],
+                    "reason": analysis['reason'],
+                    "analysis": analysis['analysis'],
+                    "indicators": analysis.get('indicators'),
+                    "macro": analysis.get('macro'),
+                    "unusual_flow": analysis.get('unusual_flow'),
+                    "risk": risk_data,
+                    "polls": analysis.get('polls', [])
+                }
             }
-        })
-    return results
+        except Exception as e:
+            print(f"Error processing {symbol}: {e}")
+            return None
+
+    # Process in parallel
+    tasks = [process_commodity(com) for com in db_commodities]
+    results = await asyncio.gather(*tasks)
+    
+    # Filter out any None results from errors
+    return [r for r in results if r is not None]
 
 @app.get("/api/holdings")
 async def get_holdings(db = Depends(get_db)):
