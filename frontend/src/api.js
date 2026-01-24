@@ -61,3 +61,27 @@ export const fetchHistory = async () => {
     if (!response.ok) throw new Error("Failed to fetch history");
     return response.json();
 };
+
+export const searchCommodities = async (query) => {
+    const response = await fetch(`${API_URL}/api/commodities/search?query=${query}`);
+    if (!response.ok) throw new Error("Failed to search commodities");
+    return response.json();
+};
+
+export const addCommodity = async (symbol, name) => {
+    const response = await fetch(`${API_URL}/api/commodities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol, name }),
+    });
+    if (!response.ok) throw new Error("Failed to add commodity");
+    return response.json();
+};
+
+export const deleteCommodity = async (symbol) => {
+    const response = await fetch(`${API_URL}/api/commodities/${symbol}`, {
+        method: "DELETE",
+    });
+    if (!response.ok) throw new Error("Failed to delete commodity");
+    return response.json();
+};

@@ -18,21 +18,16 @@ from app.config import settings
 # However, the user provided a token.
 
 # Let's try to construct a valid URL.
-db_url = settings.TURSO_DB_URL
-if not db_url:
-    db_url = "sqlite:///./trading_app.db"
-elif db_url.startswith("libsql://"):
-    # SQLAlchemy requires something like sqlite+libsql://
-    # We also need to pass the authToken if using HTTP/Websocket
-    pass
+# Turso Connection Logic (Reverted to Local for now due to driver issues)
+# db_url = settings.TURSO_DB_URL
+# ... (Turso logic commented out)
 
-# For this MVP, let's stick to a local SQLite file to guarantee "proceed" works 
-# and we can migrate/connect to Turso in the next step or if requested.
-# Or better, just use the local file for now as it's "Personal trading analytics".
+# Fallback to local
 SQLITE_URL = "sqlite:///./trading.db"
 
 engine = create_engine(
-    SQLITE_URL, connect_args={"check_same_thread": False}
+    SQLITE_URL, 
+    connect_args={"check_same_thread": False}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -68,10 +63,34 @@ class Holding(Base):
     symbol = Column(String, unique=True, index=True)
     quantity = Column(Float)
     avg_price = Column(Float)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    seed_commodities()
+
+def seed_commodities():
+    db = SessionLocal()
+    try:
+        # Check if empty
+        if db.query(Commodity).count() == 0:
+            defaults = [
+                {"symbol": "CL", "name": "Crude Oil"},
+                {"symbol": "GC", "name": "Gold"},
+                {"symbol": "SI", "name": "Silver"},
+                {"symbol": "HG", "name": "Copper"},
+                {"symbol": "NG", "name": "Natural Gas"}
+            ]
+            for item in defaults:
+                db_item = Commodity(symbol=item["symbol"], name=item["name"])
+                db.add(db_item)
+            db.commit()
+            print("Seeded default commodities.")
+    except Exception as e:
+        print(f"Error seeding DB: {e}")
+    finally:
+        db.close()
 
 def get_db():
     db = SessionLocal()

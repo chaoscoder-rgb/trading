@@ -7,11 +7,13 @@ class DataEngine:
     
     async def get_price(self, symbol: str):
         """
-        Fetch real-time price for a commodity.
+        Fetch real-time price for a commodity/symbol.
         """
         import random
         
-        # Map generic symbols to API specific symbols (Twelve Data)
+        # Map generic symbols to API specific symbols (Twelve Data) if needed
+        # For new custom added symbols, we expect the user to add the correct ticker (e.g. AAPL)
+        # But we keep the map for the legacy default commodities
         SYMBOL_MAP = {
             "GC": "XAU/USD", # Gold
             "SI": "XAG/USD", # Silver
@@ -31,7 +33,7 @@ class DataEngine:
             "NG": 2.85
         }
 
-        # If key is missing or we want to ensure data for MVP:
+        # If key is missing:
         if not self.API_KEY:
              return self._simulate_price(symbol, SIM_PRICES.get(symbol, 100.0))
 
@@ -42,7 +44,6 @@ class DataEngine:
                     params={"symbol": api_symbol, "apikey": self.API_KEY}
                 )
                 
-                # Check for API error even if 200 OK (TwelveData sometimes returns 200 with error body)
                 data = response.json()
                 
                 if "price" in data:
@@ -54,7 +55,6 @@ class DataEngine:
                 
             except Exception as e:
                 print(f"Error fetching data for {symbol}: {e}")
-                # Fallback to simulation
                 return self._simulate_price(symbol, SIM_PRICES.get(symbol, 100.0))
 
     def _simulate_price(self, symbol, base_price):
@@ -64,18 +64,30 @@ class DataEngine:
         price = base_price * (1 + variation)
         return {"symbol": symbol, "price": price, "source": "simulated"}
 
-    async def get_commodities_list(self):
+    async def search_symbols(self, query: str):
         """
-        Return list of tracked commodities.
+        Search for available symbols using TwelveData API.
         """
-        # Hardcoded list from requirements/env for MVP
-        symbols = [
-            {"symbol": "CL", "name": "Crude Oil"},
-            {"symbol": "GC", "name": "Gold"},
-            {"symbol": "SI", "name": "Silver"},
-            {"symbol": "HG", "name": "Copper"},
-            {"symbol": "NG", "name": "Natural Gas"}
-        ]
-        return symbols
+        if not self.API_KEY:
+            # Mock search
+             return [
+                 {"symbol": "AAPL", "instrument_name": "Apple Inc", "exchange": "NASDAQ", "country": "United States"},
+                 {"symbol": "TSLA", "instrument_name": "Tesla Inc", "exchange": "NASDAQ", "country": "United States"},
+                 {"symbol": "EUR/USD", "instrument_name": "Euro / US Dollar", "exchange": "Forex", "country": "United States"}
+             ]
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.BASE_URL}/symbol_search",
+                    params={"symbol": query, "apikey": self.API_KEY}
+                )
+                data = response.json()
+                if "data" in data:
+                    return data["data"]
+                return []
+            except Exception as e:
+                print(f"Error searching symbols: {e}")
+                return []
 
 data_engine = DataEngine()

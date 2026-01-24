@@ -2,14 +2,15 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from app.config import settings
-from app.db import init_db, get_db, Trade, Holding
+from app.config import settings
+from app.db import init_db, get_db, Trade, Holding, Commodity, Price
 from app.services.data_engine import data_engine
 from app.services.analytics import analytics_engine
 from pydantic import BaseModel
 from typing import Optional
 
 # 1. Initialize App
-app = FastAPI(title="ComodityVision API")
+app = FastAPI(title="TradeVision API")
 
 # 2. Configure CORS
 app.add_middleware(
@@ -26,6 +27,10 @@ def on_startup():
     init_db()
 
 # 4. Models
+class CommodityRequest(BaseModel):
+    symbol: str
+    name: str
+
 class HoldingRequest(BaseModel):
     symbol: str
     quantity: float
@@ -40,20 +45,52 @@ class TradeRequest(BaseModel):
 # 5. Endpoints
 @app.get("/")
 async def root():
-    return {"message": "Welcome to ComodityVision API"}
+    return {"message": "TradeVision API"}
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
+@app.get("/api/commodities/search")
+async def search_commodities(query: str):
+    return await data_engine.search_symbols(query)
+
+@app.post("/api/commodities")
+async def add_commodity(commodity: CommodityRequest, db: Session = Depends(get_db)):
+    # Check if exists
+    existing = db.query(Commodity).filter(Commodity.symbol == commodity.symbol).first()
+    if existing:
+        return existing
+        
+    new_commodity = Commodity(symbol=commodity.symbol, name=commodity.name)
+    db.add(new_commodity)
+    db.commit()
+    db.refresh(new_commodity)
+    return new_commodity
+
+@app.delete("/api/commodities/{symbol}")
+async def delete_commodity(symbol: str, db: Session = Depends(get_db)):
+    # Delete associated prices first to satisfy Foreign Key
+    db.query(Price).filter(Price.commodity_symbol == symbol).delete()
+    
+    # Check item
+    item = db.query(Commodity).filter(Commodity.symbol == symbol).first()
+    if item:
+        db.delete(item)
+        db.commit()
+        return {"status": "success", "message": f"{symbol} removed"}
+    return {"status": "error", "message": "Not found"}
+
 @app.get("/api/commodities")
-async def get_commodities():
-    items = await data_engine.get_commodities_list()
+async def get_commodities(db: Session = Depends(get_db)):
+    # Fetch from DB
+    items = db.query(Commodity).all()
+    
     results = []
     for item in items:
-        symbol = item["symbol"]
-        name = item["name"]
-        
+        symbol = item.symbol
+        name = item.name
+    
         price_data = await data_engine.get_price(symbol)
         risk = analytics_engine.calculate_risk(price_data)
         recommendation = await analytics_engine.generate_enhanced_recommendation(price_data, symbol)

@@ -45,7 +45,7 @@ FRED_API_KEY=8fbad145b14c1b198d6026d570401ed4
 FRED_BASE_URL=https://api.stlouisfed.org/fred
 
 # News API
-NEWS_API_KEY=your-newsapi-key-here
+NEWS_API_KEY=5551c994-d0e8-41c6-b908-f3c757a4c03b
 NEWS_API_BASE_URL=https://newsapi.org/v2
 
 # Alternative: Finnhub

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory } from '../api';
+import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI } from '../api';
 
 const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('market'); // 'market' | 'holdings'
@@ -10,6 +10,10 @@ const Dashboard = () => {
     const [selectedCommodity, setSelectedCommodity] = useState(null);
     const [tradeAmount, setTradeAmount] = useState(100);
     const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchModal, setShowSearchModal] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
 
     // Holdings State
     const [holdings, setHoldings] = useState([]);
@@ -121,13 +125,49 @@ const Dashboard = () => {
         }
     };
 
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        setIsSearching(true);
+        try {
+            const results = await searchCommodities(searchQuery);
+            setSearchResults(Array.isArray(results) ? results : []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleAddCommodity = async (symbol, name) => {
+        try {
+            await addCommodity(symbol, name);
+            setShowSearchModal(false);
+            setSearchQuery('');
+            setSearchResults([]);
+            loadData(); // Reload commodities
+        } catch (err) {
+            alert("Failed to add commodity");
+        }
+    };
+
+    const handleDeleteCommodity = async (e, symbol) => {
+        e.stopPropagation();
+        if (!confirm(`Remove ${symbol} from watchlist?`)) return;
+        try {
+            await deleteCommodityAPI(symbol);
+            loadData();
+        } catch (err) {
+            alert("Failed to remove commodity");
+        }
+    };
+
     if (loading) return <div className="p-10 text-center text-xl">Loading Market Data...</div>;
     if (error) return <div className="p-10 text-center text-red-600 font-bold">Error: {error}</div>;
 
     return (
         <div className="container mx-auto p-4">
             <header className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-800">ComodityVision</h1>
+                <h1 className="text-3xl font-bold text-gray-800">TradeVision</h1>
                 <div className="flex bg-gray-200 rounded-lg p-1">
                     <button
                         onClick={() => setActiveTab('market')}
@@ -144,6 +184,64 @@ const Dashboard = () => {
                 </div>
             </header>
 
+            {/* Search Modal */}
+            {showSearchModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[70]">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg min-h-[400px] max-h-[85vh] flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold">Add Symbol</h3>
+                            <button onClick={() => setShowSearchModal(false)} className="text-gray-500 hover:text-black">✕</button>
+                        </div>
+                        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+                            <input
+                                type="text"
+                                className="flex-1 border rounded-lg px-4 py-2 uppercase"
+                                placeholder="Search symbol (e.g. AAPL, BTC)..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">Search</button>
+                        </form>
+
+                        <div className="flex-1 overflow-y-auto">
+                            {isSearching ? <div className="text-center p-4">Searching...</div> : (
+                                <div className="space-y-2">
+                                    {searchResults.map((res, idx) => (
+                                        <div key={idx} className="flex justify-between items-center p-3 hover:bg-gray-50 border rounded-lg">
+                                            <div>
+                                                <div className="font-bold">{res.symbol}</div>
+                                                <div className="text-sm text-gray-500">{res.instrument_name || res.description}</div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleAddCommodity(res.symbol, res.instrument_name || res.description)}
+                                                className="text-blue-600 font-bold hover:bg-blue-50 px-3 py-1 rounded"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {searchResults.length === 0 && searchQuery && !isSearching && (
+                                        <div className="text-center text-gray-500 mt-4">No results found</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Sub-header for Market Tab */}
+            {activeTab === 'market' && (
+                <div className="flex justify-end mb-4">
+                    <button
+                        onClick={() => setShowSearchModal(true)}
+                        className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-gray-700 transition"
+                    >
+                        + Add Symbol
+                    </button>
+                </div>
+            )}
+
             {/* MARKET TAB */}
             {activeTab === 'market' && (
                 <>
@@ -155,6 +253,16 @@ const Dashboard = () => {
                                     ${selectedCommodity?.symbol === item.symbol ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'border-gray-200'}`}
                                 onClick={() => setSelectedCommodity(item)}
                             >
+                            >
+                                <button
+                                    onClick={(e) => handleDeleteCommodity(e, item.symbol)}
+                                    className="absolute top-2 right-2 p-1 text-gray-300 hover:text-red-500 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Remove from watchlist"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <h2 className="text-2xl font-bold text-gray-800">{item.symbol}</h2>
@@ -361,6 +469,7 @@ const Dashboard = () => {
                                         <th className="px-6 py-4 font-semibold text-right">Qty</th>
                                         <th className="px-6 py-4 font-semibold text-right">Avg Price</th>
                                         <th className="px-6 py-4 font-semibold text-right">Current Price</th>
+                                        <th className="px-6 py-4 font-semibold text-right">Time</th>
                                         <th className="px-6 py-4 font-semibold text-right">P&L</th>
                                         <th className="px-6 py-4 font-semibold text-right">Actions</th>
                                     </tr>
@@ -370,6 +479,7 @@ const Dashboard = () => {
                                         const currentPrice = commodities.find(c => c.symbol === h.symbol)?.price || 0;
                                         const pnl = (currentPrice - h.avg_price) * h.quantity;
                                         const pnlClass = pnl >= 0 ? 'text-green-600' : 'text-red-600';
+                                        const lastUpdated = h.last_updated ? new Date(h.last_updated).toLocaleString() : '-';
 
                                         return (
                                             <tr key={h.id} className="hover:bg-gray-50 transition-colors">
@@ -377,6 +487,7 @@ const Dashboard = () => {
                                                 <td className="px-6 py-4 text-right font-mono">{h.quantity}</td>
                                                 <td className="px-6 py-4 text-right font-mono">${h.avg_price.toFixed(2)}</td>
                                                 <td className="px-6 py-4 text-right font-mono text-gray-500">${currentPrice.toFixed(2)}</td>
+                                                <td className="px-6 py-4 text-right text-xs text-gray-500">{lastUpdated}</td>
                                                 <td className={`px-6 py-4 text-right font-bold font-mono ${pnlClass}`}>
                                                     {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}
                                                 </td>
@@ -408,7 +519,7 @@ const Dashboard = () => {
                                     })}
                                     {holdings.length === 0 && (
                                         <tr>
-                                            <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
+                                            <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
                                                 No holdings found. Add a dummy entry to start.
                                             </td>
                                         </tr>
@@ -429,6 +540,7 @@ const Dashboard = () => {
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                                     <tr>
+                                        <th className="px-6 py-4 font-semibold">Date</th>
                                         <th className="px-6 py-4 font-semibold">Symbol</th>
                                         <th className="px-6 py-4 font-semibold text-right">Qty Sold</th>
                                         <th className="px-6 py-4 font-semibold text-right">Sale Price</th>
@@ -446,9 +558,11 @@ const Dashboard = () => {
                                         const totalPurchase = tx.amount * purchasePrice;
                                         const profitLoss = totalSale - totalPurchase;
                                         const profitLossPercent = purchasePrice > 0 ? (profitLoss / totalPurchase) * 100 : 0;
+                                        const dateStr = tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '-';
 
                                         return (
                                             <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4 text-xs font-semibold text-gray-500">{dateStr}</td>
                                                 <td className="px-6 py-4 font-bold text-gray-800">{tx.commodity_symbol}</td>
                                                 <td className="px-6 py-4 text-right font-mono">{tx.amount}</td>
                                                 <td className="px-6 py-4 text-right font-mono">${tx.price.toFixed(2)}</td>
@@ -466,7 +580,7 @@ const Dashboard = () => {
                                     })}
                                     {history.length === 0 && (
                                         <tr>
-                                            <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                                            <td colSpan="9" className="px-6 py-12 text-center text-gray-400">
                                                 No sales history yet.
                                             </td>
                                         </tr>

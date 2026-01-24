@@ -19,3 +19,24 @@ Trade Confirmation: SELL CL
         
 -----------------------------------
 
+--- EMAIL LOG (FALLBACK) TO Dinakar.anumolu@zohomail.com ---
+Trade Confirmation: BUY SI
+
+        Dear User,
+        
+        Your trade has been executed successfully.
+        
+        Details:
+        -------------------------
+        Action:   BUY
+        Symbol:   SI
+        Quantity: 100.0
+        Price:    $31.29
+        Total:    $3129.00
+        Date:     2026-01-24 13:10:33
+        -------------------------
+        
+        Thank you for trading with ComodityVision.
+        
+-----------------------------------
+
