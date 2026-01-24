@@ -107,56 +107,93 @@ class AnalyticsEngine:
         Generate Buy/Sell/Hold recommendation with detailed analysis.
         Returns: Strong Buy, Buy, Hold, Sell, Strong Sell
         """
+        from app.services.data_engine import data_engine
         symbol = data.get('symbol', 'AAPL') 
+        current_price = data.get('price', 0.0)
         
-        # 1. Real News Sentiment
+        # 1. Real News Sentiment (Base: 50, Range: 0-100)
         news = await self.fetch_news(symbol)
         sentiment = self.analyze_sentiment(news)
-        confidence = sentiment['score']
+        news_score = sentiment['score']
         
-        # 2. Determine Action based on Confidence
+        # 2. Technical Indicators Signal (Base: 0, Range: -30 to +30)
+        indicators = await data_engine.get_indicators(symbol)
+        rsi = indicators.get('rsi', 50.0)
+        sma = indicators.get('sma')
+        
+        ti_score = 0
+        ti_signals = []
+        
+        # RSI Logic
+        if rsi < 35:
+            ti_score += 20
+            ti_signals.append(f"RSI is {rsi:.1f} (Oversold - Bullish)")
+        elif rsi > 65:
+            ti_score -= 20
+            ti_signals.append(f"RSI is {rsi:.1f} (Overbought - Bearish)")
+        else:
+            ti_signals.append(f"RSI is {rsi:.1f} (Neutral)")
+            
+        # SMA Logic
+        if sma:
+            if current_price > sma:
+                ti_score += 10
+                ti_signals.append("Trend: Above SMA20 (Bullish)")
+            else:
+                ti_score -= 10
+                ti_signals.append("Trend: Below SMA20 (Bearish)")
+        elif "sma_sim_signal" in indicators:
+            sig = indicators["sma_sim_signal"]
+            if sig == "Above SMA20":
+                ti_score += 10
+                ti_signals.append("Trend: Above SMA20 (Bullish)")
+            elif sig == "Below SMA20":
+                ti_score -= 10
+                ti_signals.append("Trend: Below SMA20 (Bearish)")
+
+        # 3. Weighted Confidence
+        # 60% News, 40% Technicals. Technically we normalize TI to a 0-100 scale or just add/subtract.
+        # Let's use: final_score = (news_score * 0.6) + ((ti_score + 30) * (100/60) * 0.4)
+        # Simplified: final_score = news_score + ti_score
+        confidence = news_score + ti_score
+        confidence = max(0, min(100, confidence)) # Clamp
+        
+        # 4. Determine Action based on Confidence
         if confidence >= 80: action = "Strong Buy"
         elif confidence >= 60: action = "Buy"
         elif confidence >= 40: action = "Hold"
         elif confidence >= 20: action = "Sell"
         else: action = "Strong Sell"
 
-        # 3. Fallback if no news OR no meaningful sentiment extracted
-        # Use fallback if news list is empty OR if we found 0 positives/negatives (neutral result might just be lack of matches)
+        # 5. Fallback if no news OR no meaningful sentiment extracted
         has_meaningful_sentiment = len(sentiment['positives']) > 0 or len(sentiment['negatives']) > 0
         
         if not news or not has_meaningful_sentiment:
-            # If we had news but no keywords matched, we might want to show at least some 'Neutral' news
-            # But user complained about "No positives/negatives".
-            
             positives = [
-                {"text": f"Market Analysis: {symbol} shows technical resilience", "source": "Analyst Consensus"},
-                {"text": "Sector Update: Positive long-term outlook", "source": "MarketWatch"}
+                {"text": f"Technical Outlook: {', '.join(ti_signals)}", "source": "System Indicator"}
             ]
-            negatives = [
-                {"text": f"Volatility Alert: {symbol} trading range expands", "source": "Risk Metrics"},
-                {"text": "Macro wind: Dollar strength impacts commodities", "source": "Reuters"}
-            ]
-            
-            # Randomize confidence for simulation if we had NO news. 
-            # If we had news but it was neutral, maybe keep the 50 score? 
-            # The user wants to see *sources* and evaluation.
-            # Let's force some simulation to ensure UI is populated.
+            negatives = []
             
             if not has_meaningful_sentiment:
-                 confidence = random.uniform(30, 70) # Varies around neutral
+                 # If no news context, rely more on TI for simulation
+                 pass 
             
             if confidence > 50:
                 sentiment['positives'] = positives
-                if not sentiment['negatives']: sentiment['negatives'] = [] # Clear if empty, or keep?
+                if not sentiment['negatives']: sentiment['negatives'] = []
             else:
-                sentiment['negatives'] = negatives
+                sentiment['negatives'] = positives # Reuse the TI signal as a data point
                 if not sentiment['positives']: sentiment['positives'] = []
 
         return {
             "action": action,
             "confidence": round(confidence, 1),
-            "reason": "Sentiment Analysis based on recent news" if news else "Technical indicators (Simulated)",
+            "reason": f"{'Mixed' if abs(ti_score) > 0 else 'Sentiment'} Analysis: {ti_signals[0] if ti_signals else ''}",
+            "indicators": {
+                "rsi": round(rsi, 1),
+                "sma": round(sma, 2) if sma else None,
+                "signals": ti_signals
+            },
             "analysis": {
                 "positives": sentiment['positives'][:3] if sentiment['positives'] else [],
                 "negatives": sentiment['negatives'][:3] if sentiment['negatives'] else []

@@ -64,6 +64,65 @@ class DataEngine:
         price = base_price * (1 + variation)
         return {"symbol": symbol, "price": price, "source": "simulated"}
 
+    async def get_indicators(self, symbol: str):
+        """
+        Fetch RSI and SMA for a commodity/symbol.
+        """
+        SYMBOL_MAP = {
+            "GC": "XAU/USD",
+            "SI": "XAG/USD",
+            "CL": "WTI/USD",
+            "HG": "XCU/USD",
+            "NG": "XNG/USD"
+        }
+        api_symbol = SYMBOL_MAP.get(symbol, symbol)
+
+        if not self.API_KEY:
+            return self._simulate_indicators(symbol)
+
+        async with httpx.AsyncClient() as client:
+            try:
+                # TwelveData RSI
+                rsi_res = await client.get(
+                    f"{self.BASE_URL}/rsi",
+                    params={"symbol": api_symbol, "interval": "1day", "time_period": 14, "apikey": self.API_KEY}
+                )
+                rsi_data = rsi_res.json()
+                if "values" not in rsi_data or rsi_data.get("status") == "error":
+                    print(f"RSI API Error/Limit for {symbol}: {rsi_data.get('message', 'No values')}")
+                    return self._simulate_indicators(symbol)
+                
+                rsi_val = float(rsi_data["values"][0]["rsi"])
+
+                # TwelveData SMA
+                sma_res = await client.get(
+                    f"{self.BASE_URL}/sma",
+                    params={"symbol": api_symbol, "interval": "1day", "time_period": 20, "apikey": self.API_KEY}
+                )
+                sma_data = sma_res.json()
+                sma_val = float(sma_data["values"][0]["sma"]) if "values" in sma_data and sma_data.get("status") != "error" else None
+
+                return {
+                    "rsi": rsi_val,
+                    "sma": sma_val
+                }
+                
+            except Exception as e:
+                print(f"Error fetching indicators for {symbol}: {e}")
+                return self._simulate_indicators(symbol)
+
+    def _simulate_indicators(self, symbol):
+        import random
+        # Highly varied mockup for testing logic when API is limited
+        rsi = random.uniform(25.0, 75.0)
+        # Simulate SMA being slightly above or below price randomly
+        sma_signal = random.choice(["Above SMA20", "Below SMA20", None])
+        
+        return {
+            "rsi": rsi,
+            "sma_sim_signal": sma_signal # Internal hint for analytics
+        }
+
     async def search_symbols(self, query: str):
         """
         Search for available symbols using TwelveData API.

@@ -289,26 +289,54 @@ const Dashboard = () => {
                                     </div>
                                 </div>
 
-                                {/* Recommendation Pill */}
-                                <div className="mb-4">
+                                {/* Indicators & Recommendation */}
+                                <div className="mb-4 space-y-3">
                                     <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                                        <span className="text-sm font-medium text-gray-500">Signal</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-gray-400">{item.recommendation.confidence}% Conf.</span>
-                                            <span className={`px-3 py-1 rounded-full text-sm font-bold text-white shadow-sm
-                                                ${item.recommendation.action.includes('Buy') ? 'bg-green-500' :
-                                                    item.recommendation.action.includes('Sell') ? 'bg-red-500' : 'bg-gray-500'}`}>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Signal</span>
+                                            <span className={`text-sm font-bold ${item.recommendation.action.includes('Buy') ? 'text-green-600' :
+                                                item.recommendation.action.includes('Sell') ? 'text-red-600' : 'text-gray-500'}`}>
                                                 {item.recommendation.action}
                                             </span>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs font-bold text-gray-400">{item.recommendation.confidence}% Conf.</div>
+                                            <div className="w-16 h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                                                <div
+                                                    className={`h-full transition-all duration-500 ${item.recommendation.confidence > 70 ? 'bg-green-500' :
+                                                        item.recommendation.confidence > 40 ? 'bg-yellow-500' : 'bg-red-500'
+                                                        }`}
+                                                    style={{ width: `${item.recommendation.confidence}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* New Technical Indicators Row */}
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 bg-blue-50/50 rounded-lg p-2 text-center">
+                                            <div className="text-[10px] font-bold text-blue-400 uppercase">RSI</div>
+                                            <div className={`text-sm font-mono font-bold ${item.recommendation.indicators?.rsi < 35 ? 'text-green-600' :
+                                                item.recommendation.indicators?.rsi > 65 ? 'text-red-600' : 'text-blue-600'
+                                                }`}>
+                                                {item.recommendation.indicators?.rsi || '-'}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 bg-purple-50/50 rounded-lg p-2 text-center">
+                                            <div className="text-[10px] font-bold text-purple-400 uppercase">Trend</div>
+                                            <div className="text-sm font-bold text-purple-600">
+                                                {item.recommendation.indicators?.signals?.some(s => s.includes('Above SMA')) ? 'Bullish' :
+                                                    item.recommendation.indicators?.signals?.some(s => s.includes('Below SMA')) ? 'Bearish' : 'Neutral'}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Quick Analysis Preview (First bullet) */}
                                 {item.recommendation.analysis?.positives?.[0] && (
-                                    <div className="text-sm text-gray-600 flex items-start gap-2">
+                                    <div className="text-xs text-gray-500 flex items-start gap-2 border-t border-gray-50 pt-3">
                                         <span className="text-green-500 font-bold">↑</span>
-                                        <span className="truncate">{item.recommendation.analysis.positives[0].text}</span>
+                                        <span className="truncate italic">"{item.recommendation.analysis.positives[0].text}"</span>
                                     </div>
                                 )}
                             </div>
@@ -318,6 +346,15 @@ const Dashboard = () => {
                     {/* DETAIL PANEL */}
                     {selectedCommodity && (
                         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-100 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-6 z-50 animate-slide-up">
+                            <button
+                                onClick={() => setSelectedCommodity(null)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-black p-2 rounded-full hover:bg-gray-100 transition-colors z-[60]"
+                                title="Close details"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                             <div className="container mx-auto flex flex-col lg:flex-row gap-8 max-w-7xl">
                                 {/* Left: Action */}
                                 <div className="lg:w-1/4 flex flex-col justify-between border-r pr-6">
@@ -328,7 +365,10 @@ const Dashboard = () => {
                                         </div>
 
                                         <div className="mb-6">
-                                            <div className="text-sm text-gray-500 mb-1">Confidence Score</div>
+                                            <div className="text-sm text-gray-500 mb-1 flex justify-between items-center">
+                                                <span>Confidence Score</span>
+                                                <span className="text-xs font-bold text-gray-400">{selectedCommodity.recommendation.reason}</span>
+                                            </div>
                                             <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
                                                 <div
                                                     className={`h-full transition-all duration-500 ${selectedCommodity.recommendation.confidence > 60 ? 'bg-green-500' : 'bg-yellow-500'
@@ -338,6 +378,21 @@ const Dashboard = () => {
                                             </div>
                                             <div className="text-right text-xs font-bold mt-1">{selectedCommodity.recommendation.confidence}%</div>
                                         </div>
+
+                                        {/* Technical Signals in Detail Panel */}
+                                        {selectedCommodity.recommendation.indicators?.signals && (
+                                            <div className="mb-6 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                                <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2">Technical Signals</h4>
+                                                <div className="space-y-1">
+                                                    {selectedCommodity.recommendation.indicators.signals.map((sig, i) => (
+                                                        <div key={i} className="text-xs font-medium text-gray-700 flex items-center gap-2">
+                                                            <span className="w-1 h-1 bg-blue-400 rounded-full"></span>
+                                                            {sig}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Holding Info in Detail Panel */}
                                         {(() => {
