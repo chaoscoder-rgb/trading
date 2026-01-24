@@ -1,0 +1,21 @@
+--- EMAIL SENT TO Dinakar.anumolu@zohomail.com ---
+Trade Confirmation: SELL CL
+
+        Dear User,
+        
+        Your trade has been executed successfully.
+        
+        Details:
+        -------------------------
+        Action:   SELL
+        Symbol:   CL
+        Quantity: 5.0
+        Price:    $80.00
+        Total:    $400.00
+        Date:     2026-01-24 12:16:12
+        -------------------------
+        
+        Thank you for trading with ComodityVision.
+        
+-----------------------------------
+

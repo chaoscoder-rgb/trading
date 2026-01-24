@@ -1,0 +1,106 @@
+# ============================================
+# DATABASE CONFIGURATION (TURSO)
+# ============================================
+TURSO_DB_URL=libsql://trading-chaoscoder-rgb.aws-us-east-2.turso.io
+TURSO_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NjkyNzIzNDQsImlkIjoiY2IzYjMwYTQtNzljYi00YzgxLTlmZjAtMzg1YThhZWU4ZTJlIiwicmlkIjoiMTZkMjRhNjItNjgzNS00ZjJhLWFhM2EtOTk3NTdlZDJkNWI0In0.5xqJ-_YGTiDgyeFKdwJaLwlQHRfYogBBNjKxbtTbfNz6YqOROHqTtzJWrkRamrA0ksj_mJNcpysHouLb0XubAg
+
+# ============================================
+# TWELVE DATA API CONFIGURATION
+# ============================================
+TWELVEDATA_API_KEY=8bd13d536bd24e8aafd154c4506a588a
+TWELVEDATA_BASE_URL=https://api.twelvedata.com
+TWELVEDATA_RATE_LIMIT=800  # requests per day
+TWELVEDATA_REAL_TIME_ENABLED=true
+
+# Commodity Symbols for Twelve Data
+COMMODITY_SYMBOLS=CL,GC,SI,HG,NG,ZO,ZS,ZW,KC,CC,SB,CT,LB,PL,PA,AL,ZN,SN,XPT,XPD
+
+# ============================================
+# POLYMARKET API CONFIGURATION
+# ============================================
+#POLYMARKET_API_KEY=your-polymarket-api-key-here
+#POLYMARKET_BASE_URL=https://gamma-api.polymarket.com
+#POLYMARKET_CHAIN_ID=137  # Polygon Mainnet
+#POLYMARKET_RPC_URL=https://polygon-rpc.com
+
+# ============================================
+# EMAIL CONFIGURATION
+# ============================================
+EMAIL_SENDER=dinakar.anumolu@zohomail.com
+EMAIL_PASSWORD=6Ku5eLmjjEk5
+SMTP_SERVER=smtp.zoho.com
+SMTP_PORT=587
+EMAIL_FROM=dinakar.anumolu@zohomail.com
+EMAIL_ALERTS_ENABLED=true
+
+# ============================================
+# ADDITIONAL DATA SOURCES
+# ============================================
+# Alpha Vantage (alternative/backup)
+ALPHA_VANTAGE_API_KEY=61VWH0TC3U9WBMDM
+ALPHA_VANTAGE_BASE_URL=https://www.alphavantage.co/query
+
+# FRED API (Federal Reserve Economic Data)
+FRED_API_KEY=8fbad145b14c1b198d6026d570401ed4 
+FRED_BASE_URL=https://api.stlouisfed.org/fred
+
+# News API
+NEWS_API_KEY=your-newsapi-key-here
+NEWS_API_BASE_URL=https://newsapi.org/v2
+
+# Alternative: Finnhub
+FINNHUB_API_KEY=d5qgtjhr01qhn30fkergd5qgtjhr01qhn30fkes0
+
+# ============================================
+# CACHING CONFIGURATION
+# ============================================
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=your-redis-password
+REDIS_TTL=3600  # Cache TTL in seconds (1 hour)
+
+# Data caching durations (seconds)
+CACHE_TTL_MARKET_DATA=300    # 5 minutes
+CACHE_TTL_NEWS=900          # 15 minutes
+CACHE_TTL_SENTIMENT=1800    # 30 minutes
+CACHE_TTL_FUNDAMENTALS=86400 # 24 hours
+
+# ============================================
+# ML/AI MODEL CONFIGURATION
+# ============================================
+ML_MODEL_PATH=./models
+ML_PREDICTION_THRESHOLD=0.65  # Confidence threshold for recommendations
+
+# Model versioning
+RISK_MODEL_VERSION=v1.0
+RECOMMENDATION_MODEL_VERSION=v1.0
+SENTIMENT_MODEL_VERSION=bert-base-uncased
+
+# ============================================
+# STOP LOSS & RISK CONFIGURATION
+# ============================================
+DEFAULT_STOP_LOSS_PERCENT=10
+DEFAULT_TAKE_PROFIT_PERCENT=20
+MAX_PORTFOLIO_RISK=0.25  # Maximum 25% portfolio at risk
+MIN_POSITION_SIZE=100    # Minimum $100 position
+
+# Risk level mappings
+RISK_VERY_HIGH_STOP=15
+RISK_HIGH_STOP=12
+RISK_MEDIUM_STOP=10
+RISK_LOW_STOP=8
+
+# ============================================
+# PAPER TRADING CONFIGURATION
+# ============================================
+PAPER_TRADING_STARTING_CAPITAL=10000
+PAPER_TRADING_COMMISSION=0.001  # 0.1% commission
+PAPER_TRADING_SLIPPAGE=0.0005   # 0.05% slippage
+
+
+# ============================================
+# LOGGING CONFIGURATION
+# ============================================
+LOG_LEVEL=info  # debug, info, warn, error
+LOG_FILE_PATH=./logs/app.log
+LOG_RETENTION_DAYS=30
+
