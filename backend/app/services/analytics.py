@@ -321,8 +321,16 @@ class AnalyticsEngine:
             rec["polls"] = polls
         except Exception:
             rec["polls"] = []
+            
+        # 3. Fetch Kalshi Data
+        try:
+            from app.services.kalshi import kalshi_service
+            kalshi_data = await kalshi_service.get_market_data(symbol)
+            rec["kalshi"] = kalshi_data
+        except Exception:
+            rec["kalshi"] = []
 
-        # 3. Fetch Historical Accuracy (Self-Correction)
+        # 4. Fetch Historical Accuracy (Self-Correction)
         accuracy = await self.get_historical_accuracy(symbol)
         rec["historical_accuracy"] = accuracy
             

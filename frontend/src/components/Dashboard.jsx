@@ -691,11 +691,12 @@ const Dashboard = () => {
                                             )}
 
                                             {/* Prediction Markets (Polymarket) */}
-                                            {selectedCommodity.recommendation.polls?.length > 0 && (
-                                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
-                                                        <span className="text-lg">📊</span> Prediction Market Insights
-                                                    </h3>
+                                            {/* Prediction Markets (Polymarket) */}
+                                            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                                    <span className="text-lg">📊</span> Polymarket Insights
+                                                </h3>
+                                                {selectedCommodity.recommendation.polls?.length > 0 ? (
                                                     <div className="space-y-5">
                                                         {selectedCommodity.recommendation.polls.map((poll, i) => (
                                                             <div key={i} className="flex flex-col gap-2">
@@ -713,8 +714,43 @@ const Dashboard = () => {
                                                             </div>
                                                         ))}
                                                     </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-400 italic text-center py-4">No relevant info from Polymarket.</p>
+                                                )}
+                                            </div>
+
+                                            {/* Kalshi Predictions */}
+                                            {/* Kalshi Predictions */}
+                                            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm mt-6">
+                                                <div className="flex justify-between items-center mb-5">
+                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                        <span className="text-lg">📈</span> Kalshi Insights
+                                                    </h3>
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 uppercase">Regulated</span>
                                                 </div>
-                                            )}
+
+                                                {selectedCommodity.recommendation.kalshi && selectedCommodity.recommendation.kalshi.length > 0 ? (
+                                                    <div className="space-y-5">
+                                                        {selectedCommodity.recommendation.kalshi.map((m, i) => (
+                                                            <div key={i} className="flex flex-col gap-2">
+                                                                <div className="text-sm font-bold text-gray-800">{m.question}</div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden flex">
+                                                                        <div className="h-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.3)]" style={{ width: `${m.yes_price}%` }} />
+                                                                        <div className="h-full bg-gray-300" style={{ width: `${m.no_price}%` }} />
+                                                                    </div>
+                                                                    <div className="flex gap-2 text-[10px] font-black uppercase">
+                                                                        <span className="text-indigo-600">Yes {m.yes_price}%</span>
+                                                                        <span className="text-gray-500">No {m.no_price}%</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-400 italic text-center py-4">No relevant info from Kalshi.</p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

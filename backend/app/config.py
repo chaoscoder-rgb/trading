@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # FRED (Macro Data)
     FRED_API_KEY: str = ""
     FRED_BASE_URL: str = "https://api.stlouisfed.org/fred"
+
+    # KALSHI
+    KALSHI_API_KEY: str = "4fe64e48-3b5a-4809-bfe7-d31896b85e25"
+    KALSHI_BASE_URL: str = "https://trading-api.kalshi.com/trade-api/v2"
     
     # Email
     EMAIL_SENDER: str = ""
