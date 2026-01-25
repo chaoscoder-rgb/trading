@@ -37,11 +37,27 @@ class PolymarketService:
                 }
                 
                 terms = search_terms.get(keyword, [keyword])
+                import re
                 
                 filtered = []
                 for m in markets:
                     question = m.get("question", "").lower()
-                    if any(t.lower() in question for t in terms):
+                    # Clean match: Word boundary or exact match
+                    is_match = False
+                    for t in terms:
+                        t = t.lower()
+                        # If term is short (<= 2 chars), enforce strict word boundary
+                        if len(t) <= 2:
+                            if re.search(r'\b' + re.escape(t) + r'\b', question):
+                                is_match = True
+                                break
+                        # If term is longer, allow substring but maybe be safely strict
+                        else:
+                            if t in question:
+                                is_match = True
+                                break
+                                
+                    if is_match:
                         outcomes = m.get("outcomes", "Yes/No")
                         prices = m.get("outcomePrices", [])
                         if isinstance(prices, str):

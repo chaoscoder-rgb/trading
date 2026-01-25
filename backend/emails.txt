@@ -61,3 +61,45 @@ Trade Confirmation: BUY SI
         
 -----------------------------------
 
+--- EMAIL LOG (FALLBACK) TO Dinakar.anumolu@zohomail.com ---
+Trade Confirmation: BUY G
+
+        Dear User,
+        
+        A trade has been executed on your account.
+        
+        Transaction Details
+        ====================
+        Action:        BUY
+        Ticker:        G
+        Strike Price:  $48.80
+        Quantity:      100.0
+        Total Value:   $4880.00
+        Date:          2026-01-25 11:50:40
+        
+        
+        Happy Trading!
+        
+-----------------------------------
+
+--- EMAIL LOG (FALLBACK) TO Dinakar.anumolu@zohomail.com ---
+Trade Confirmation: SELL G
+
+        Dear User,
+        
+        A trade has been executed on your account.
+        
+        Transaction Details
+        ====================
+        Action:        SELL
+        Ticker:        G
+        Strike Price:  $100.47
+        Quantity:      10.0
+        Total Value:   $1004.70
+        Date:          2026-01-25 11:50:57
+        Profit/Loss: $516.70 (GREEN)
+        
+        Happy Trading!
+        
+-----------------------------------
+

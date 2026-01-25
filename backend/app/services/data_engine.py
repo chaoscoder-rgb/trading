@@ -64,11 +64,9 @@ class DataEngine:
                 
                 # If API fails or returns error, use SIMULATION (Robust MVP)
                 error_msg = data.get('message', 'Unknown API Error')
-                print(f"API Error for {symbol} ({api_symbol}): {data}")
                 return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0), reason=f"API: {error_msg}")
                 
             except Exception as e:
-                print(f"Error fetching data for {symbol}: {e}")
                 return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0), reason=f"Error: {str(e)}")
 
     def _simulate_price(self, symbol, base_price, reason="Simulation"):
@@ -139,30 +137,7 @@ class DataEngine:
             "sma_sim_signal": sma_signal # Internal hint for analytics
         }
 
-    def _simulate_history(self, symbol, days):
-        import random
-        # Base volatility factor per symbol for more interesting UI
-        VOL_MAP = {
-            "GC": 0.005,  # Low volatility (Gold)
-            "SI": 0.015,  # Med
-            "CL": 0.025,  # High (Oil)
-            "HG": 0.012,
-            "NG": 0.040   # Very High (Nat Gas)
-        }
-        v_factor = VOL_MAP.get(symbol, 0.02)
-        
-        base = self.SIM_PRICES.get(symbol, 100.0) # Use updated sim price as anchor
-        prices = []
-        # Calculate a start price that drifts to the current base price
-        curr = base * (1 - (random.uniform(-0.1, 0.1) * (days/30)))
-        
-        for _ in range(days):
-            curr = curr * (1 + random.uniform(-v_factor, v_factor))
-            prices.append(curr)
-            
-        # Ensure the last price is close to the current SIM price for consistency
-        prices[-1] = base * (1 + random.uniform(-0.005, 0.005))
-        return prices
+
 
     async def get_historical_prices(self, symbol: str, days: int = 30):
         """

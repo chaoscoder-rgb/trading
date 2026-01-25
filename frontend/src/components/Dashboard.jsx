@@ -282,7 +282,7 @@ const Dashboard = () => {
             {activeTab === 'market' && (
                 <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-200px)] min-h-[600px]">
                     {/* LEFT: Master List */}
-                    <div className="lg:w-[350px] flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="lg:w-[350px] flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar shrink-0">
                         {commodities.map((item) => (
                             <div
                                 key={item.symbol}
