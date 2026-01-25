@@ -287,9 +287,11 @@ const Dashboard = () => {
 
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-xs text-gray-500 font-medium truncate max-w-[120px]">{item.name}</span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.risk.level === 'Low' ? 'bg-green-100 text-green-700' :
-                                        item.risk.level === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                                        {item.risk.level}
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.recommendation.action.includes('Buy') ? 'bg-green-100 text-green-700' :
+                                            item.recommendation.action.includes('Sell') ? 'bg-red-100 text-red-700' :
+                                                'bg-gray-100 text-gray-700'
+                                        }`}>
+                                        {item.recommendation.action}
                                     </span>
                                 </div>
 
