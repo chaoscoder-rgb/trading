@@ -56,22 +56,27 @@ class DataEngine:
                 data = response.json()
                 
                 if "price" in data:
-                    return {"symbol": symbol, "price": float(data["price"])}
+                    return {
+                        "symbol": symbol, 
+                        "price": float(data["price"]),
+                        "source": "Live"
+                    }
                 
                 # If API fails or returns error, use SIMULATION (Robust MVP)
+                error_msg = data.get('message', 'Unknown API Error')
                 print(f"API Error for {symbol} ({api_symbol}): {data}")
-                return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0))
+                return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0), reason=f"API: {error_msg}")
                 
             except Exception as e:
                 print(f"Error fetching data for {symbol}: {e}")
-                return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0))
+                return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0), reason=f"Error: {str(e)}")
 
-    def _simulate_price(self, symbol, base_price):
+    def _simulate_price(self, symbol, base_price, reason="Simulation"):
         import random
         # Add slight variation (-1% to +1%)
         variation = random.uniform(-0.01, 0.01)
         price = base_price * (1 + variation)
-        return {"symbol": symbol, "price": price, "source": "simulated"}
+        return {"symbol": symbol, "price": price, "source": "Simulated", "message": reason}
 
     async def get_indicators(self, symbol: str):
         """

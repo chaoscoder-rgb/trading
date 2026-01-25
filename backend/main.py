@@ -114,6 +114,8 @@ async def get_commodities(background_tasks: BackgroundTasks, db = Depends(get_db
                 "price": data.get('price', 0.0),
                 "change": data.get('change', 0.0),
                 "changePercent": data.get('change_percent', 0.0),
+                "source": data.get('source', 'Simulated'),
+                "message": data.get('message', ''),
                 "risk": risk_data,
                 "recommendation": {
                     "action": analysis['action'],

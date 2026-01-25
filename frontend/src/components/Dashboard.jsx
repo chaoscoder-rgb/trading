@@ -366,7 +366,19 @@ const Dashboard = () => {
                                         </div>
                                         <div className="text-right mt-4 md:mt-0">
                                             <div className="text-4xl font-mono font-bold text-gray-900">${parseFloat(selectedCommodity.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                            <div className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">Real-time Price</div>
+                                            {selectedCommodity.source !== 'Live' && <div className="text-[9px] text-gray-400 text-right mt-1">* Hover "SIMULATED" for details</div>}
+                                            <div className="flex items-center justify-end gap-2 mt-1 relative group">
+                                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded cursor-help ${selectedCommodity.source === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                    {selectedCommodity.source || 'Simulated'}
+                                                </span>
+                                                {selectedCommodity.source !== 'Live' && (
+                                                    <div className="absolute right-0 top-full mt-2 w-max max-w-[250px] bg-gray-900/95 backdrop-blur-sm text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all z-[100] pointer-events-none border border-gray-700">
+                                                        <div className="font-bold mb-1 text-gray-400 uppercase tracking-wider text-[9px]">Simulation Reason</div>
+                                                        {selectedCommodity.message || 'Data source is simulated due to API unavailability.'}
+                                                    </div>
+                                                )}
+                                                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Price</span>
+                                            </div>
                                         </div>
                                     </div>
 
