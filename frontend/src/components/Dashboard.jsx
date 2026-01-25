@@ -39,6 +39,16 @@ const Dashboard = () => {
         }
     }, [selectedCommodity, timeRange]);
 
+    // Sync selectedCommodity when commodities list updates
+    useEffect(() => {
+        if (selectedCommodity && commodities.length > 0) {
+            const updated = commodities.find(c => c.symbol === selectedCommodity.symbol);
+            if (updated && updated !== selectedCommodity) {
+                setSelectedCommodity(updated);
+            }
+        }
+    }, [commodities]);
+
     // Holdings State
     const [holdings, setHoldings] = useState([]);
     const [history, setHistory] = useState([]);
@@ -84,6 +94,8 @@ const Dashboard = () => {
     useEffect(() => {
         if (activeTab === 'holdings') {
             loadHoldings();
+        } else if (activeTab === 'market' && commodities.length === 0) {
+            loadData();
         }
     }, [activeTab]);
 
@@ -407,9 +419,24 @@ const Dashboard = () => {
                                                     </linearGradient>
                                                 </defs>
                                                 <XAxis
-                                                    dataKey="day"
+                                                    dataKey="date"
                                                     tick={{ fontSize: 10, fill: '#9ca3af' }}
-                                                    tickFormatter={(val) => `D${val}`}
+                                                    tickFormatter={(val) => {
+                                                        if (!val) return '';
+                                                        const date = new Date(val);
+                                                        // 1D/1W: show Day Name (Mon)
+                                                        if (['1D', '1W'].includes(timeRange)) {
+                                                            return date.toLocaleDateString('en-US', { weekday: 'short' });
+                                                        }
+                                                        // 1M/YTD: show Date (Jan 25)
+                                                        else if (['1M', 'YTD'].includes(timeRange)) {
+                                                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                                        }
+                                                        // 1Y+: show Month (Jan)
+                                                        else {
+                                                            return date.toLocaleDateString('en-US', { month: 'short' });
+                                                        }
+                                                    }}
                                                 />
                                                 <YAxis
                                                     domain={['auto', 'auto']}

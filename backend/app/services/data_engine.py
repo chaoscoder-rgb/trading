@@ -18,6 +18,8 @@ class DataEngine:
         "MSFT": 450.00,
         "GOOGL": 190.00,
         "AMZN": 205.00,
+        "G": 45.80,
+        "JNJ": 160.00,
         "SPY": 590.00,
         "QQQ": 510.00
     }
@@ -137,6 +139,26 @@ class DataEngine:
             "sma_sim_signal": sma_signal # Internal hint for analytics
         }
 
+    def _simulate_history(self, symbol, days):
+        import random
+        from datetime import datetime, timedelta
+        
+        prices = []
+        current = self.SIM_PRICES.get(symbol, 100.0)
+        today = datetime.now()
+        
+        # Generate history backwards then reverse, or generate forwards up to today
+        # Let's generate backwards from today
+        history = []
+        for i in range(days):
+            date = (today - timedelta(days=days-1-i)).strftime('%Y-%m-%d')
+            # Random walk
+            change = random.uniform(-0.02, 0.02)
+            current = current * (1 + change)
+            history.append({"date": date, "close": current})
+            
+        return history
+
 
 
     async def get_historical_prices(self, symbol: str, days: int = 30):
@@ -169,7 +191,9 @@ class DataEngine:
                 )
                 data = response.json()
                 if "values" in data:
-                    return [float(v["close"]) for v in data["values"]]
+                    # TwelveData returns newest first, so reverse it
+                    values = data["values"][::-1]
+                    return [{"date": v["datetime"], "close": float(v["close"])} for v in values]
                 
                 print(f"History API Error for {symbol}: {data.get('message')}")
                 return self._simulate_history(symbol, days)
