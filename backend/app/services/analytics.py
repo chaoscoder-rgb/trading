@@ -75,7 +75,8 @@ class AnalyticsEngine:
                         "from": week_ago,
                         "to": today,
                         "token": self.api_key
-                    }
+                    },
+                    timeout=4.0
                 )
                 if response.status_code == 200:
                     return response.json()

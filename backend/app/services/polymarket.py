@@ -20,7 +20,8 @@ class PolymarketService:
                         "order": "volume", # Get high volume/popular ones
                         "ascending": "false",
                         # "q": keyword # Not all endpoints support q, but let's try or filter client side
-                    }
+                    },
+                    timeout=4.0
                 )
                 resp.raise_for_status()
                 markets = resp.json()

@@ -5,6 +5,23 @@ class DataEngine:
     BASE_URL = settings.TWELVEDATA_BASE_URL
     API_KEY = settings.TWELVEDATA_API_KEY
     
+    SIM_PRICES = {
+        "GC": 2650.00,
+        "SI": 31.50,
+        "CL": 74.20,
+        "HG": 4.15,
+        "NG": 2.85,
+        "AAPL": 248.00,
+        "TSLA": 415.00,
+        "NVDA": 135.00,
+        "AMD": 175.00,
+        "MSFT": 450.00,
+        "GOOGL": 190.00,
+        "AMZN": 205.00,
+        "SPY": 590.00,
+        "QQQ": 510.00
+    }
+    
     async def get_price(self, symbol: str):
         """
         Fetch real-time price for a commodity/symbol.
@@ -23,25 +40,17 @@ class DataEngine:
         }
         
         api_symbol = SYMBOL_MAP.get(symbol, symbol)
-        
-        # Fallback simulation prices (Base price around current market)
-        SIM_PRICES = {
-            "GC": 2650.00,
-            "SI": 31.50,
-            "CL": 74.20,
-            "HG": 4.15,
-            "NG": 2.85
-        }
 
         # If key is missing:
         if not self.API_KEY:
-             return self._simulate_price(symbol, SIM_PRICES.get(symbol, 100.0))
+             return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0))
 
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
                     f"{self.BASE_URL}/price",
-                    params={"symbol": api_symbol, "apikey": self.API_KEY}
+                    params={"symbol": api_symbol, "apikey": self.API_KEY},
+                    timeout=3.0
                 )
                 
                 data = response.json()
@@ -51,11 +60,11 @@ class DataEngine:
                 
                 # If API fails or returns error, use SIMULATION (Robust MVP)
                 print(f"API Error for {symbol} ({api_symbol}): {data}")
-                return self._simulate_price(symbol, SIM_PRICES.get(symbol, 100.0))
+                return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0))
                 
             except Exception as e:
                 print(f"Error fetching data for {symbol}: {e}")
-                return self._simulate_price(symbol, SIM_PRICES.get(symbol, 100.0))
+                return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0))
 
     def _simulate_price(self, symbol, base_price):
         import random
@@ -85,7 +94,8 @@ class DataEngine:
                 # TwelveData RSI
                 rsi_res = await client.get(
                     f"{self.BASE_URL}/rsi",
-                    params={"symbol": api_symbol, "interval": "1day", "time_period": 14, "apikey": self.API_KEY}
+                    params={"symbol": api_symbol, "interval": "1day", "time_period": 14, "apikey": self.API_KEY},
+                    timeout=3.0
                 )
                 rsi_data = rsi_res.json()
                 if "values" not in rsi_data or rsi_data.get("status") == "error":
@@ -97,7 +107,8 @@ class DataEngine:
                 # TwelveData SMA
                 sma_res = await client.get(
                     f"{self.BASE_URL}/sma",
-                    params={"symbol": api_symbol, "interval": "1day", "time_period": 20, "apikey": self.API_KEY}
+                    params={"symbol": api_symbol, "interval": "1day", "time_period": 20, "apikey": self.API_KEY},
+                    timeout=3.0
                 )
                 sma_data = sma_res.json()
                 sma_val = float(sma_data["values"][0]["sma"]) if "values" in sma_data and sma_data.get("status") != "error" else None
@@ -135,12 +146,17 @@ class DataEngine:
         }
         v_factor = VOL_MAP.get(symbol, 0.02)
         
-        base = 100.0
+        base = self.SIM_PRICES.get(symbol, 100.0) # Use updated sim price as anchor
         prices = []
-        curr = base
+        # Calculate a start price that drifts to the current base price
+        curr = base * (1 - (random.uniform(-0.1, 0.1) * (days/30)))
+        
         for _ in range(days):
             curr = curr * (1 + random.uniform(-v_factor, v_factor))
             prices.append(curr)
+            
+        # Ensure the last price is close to the current SIM price for consistency
+        prices[-1] = base * (1 + random.uniform(-0.005, 0.005))
         return prices
 
     async def get_historical_prices(self, symbol: str, days: int = 30):
@@ -168,7 +184,8 @@ class DataEngine:
                         "interval": "1day",
                         "outputsize": days,
                         "apikey": self.API_KEY
-                    }
+                    },
+                    timeout=5.0
                 )
                 data = response.json()
                 if "values" in data:

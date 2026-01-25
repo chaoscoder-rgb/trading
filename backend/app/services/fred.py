@@ -22,7 +22,8 @@ class FredService:
                         "limit": 1,
                         "file_type": "json",
                         "api_key": self.API_KEY
-                    }
+                    },
+                    timeout=3.0
                 )
                 data = response.json()
                 if "observations" in data and len(data["observations"]) > 0:

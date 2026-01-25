@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI } from '../api';
+import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory } from '../api';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('market'); // 'market' | 'holdings'
@@ -8,12 +9,35 @@ const Dashboard = () => {
     const [commodities, setCommodities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedCommodity, setSelectedCommodity] = useState(null);
+    const [historyData, setHistoryData] = useState([]); // Chart data
+    const [timeRange, setTimeRange] = useState('1M'); // Time range state
+
     const [tradeAmount, setTradeAmount] = useState(100);
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchModal, setShowSearchModal] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+
+    const TIME_RANGES = {
+        '1D': 1,
+        '1W': 7,
+        '1M': 30,
+        '1Y': 365,
+        'YTD': Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24)),
+        '3Y': 1095,
+        '5Y': 1825
+    };
+
+    // Fetch History when commodity or timeRange selected
+    useEffect(() => {
+        if (selectedCommodity) {
+            const days = TIME_RANGES[timeRange] || 30;
+            fetchCommodityHistory(selectedCommodity.symbol, days)
+                .then(data => setHistoryData(data))
+                .catch(err => console.error("Failed to load history chart", err));
+        }
+    }, [selectedCommodity, timeRange]);
 
     // Holdings State
     const [holdings, setHoldings] = useState([]);
@@ -288,8 +312,8 @@ const Dashboard = () => {
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-xs text-gray-500 font-medium truncate max-w-[120px]">{item.name}</span>
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.recommendation.action.includes('Buy') ? 'bg-green-100 text-green-700' :
-                                            item.recommendation.action.includes('Sell') ? 'bg-red-100 text-red-700' :
-                                                'bg-gray-100 text-gray-700'
+                                        item.recommendation.action.includes('Sell') ? 'bg-red-100 text-red-700' :
+                                            'bg-gray-100 text-gray-700'
                                         }`}>
                                         {item.recommendation.action}
                                     </span>
@@ -344,6 +368,58 @@ const Dashboard = () => {
                                             <div className="text-4xl font-mono font-bold text-gray-900">${parseFloat(selectedCommodity.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                             <div className="text-sm font-bold text-gray-400 mt-1 uppercase tracking-widest">Real-time Price</div>
                                         </div>
+                                    </div>
+
+                                    {/* Price Chart */}
+                                    <div className="flex justify-end gap-1 mb-2">
+                                        {Object.keys(TIME_RANGES).map(range => (
+                                            <button
+                                                key={range}
+                                                onClick={() => setTimeRange(range)}
+                                                className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${timeRange === range
+                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                    }`}
+                                            >
+                                                {range}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="h-64 w-full mb-6">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={historyData}>
+                                                <defs>
+                                                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
+                                                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <XAxis
+                                                    dataKey="day"
+                                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                                    tickFormatter={(val) => `D${val}`}
+                                                />
+                                                <YAxis
+                                                    domain={['auto', 'auto']}
+                                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                                                    width={40}
+                                                />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                    labelStyle={{ display: 'none' }}
+                                                    formatter={(value) => [`$${value.toFixed(2)}`, 'Price']}
+                                                />
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="price"
+                                                    stroke="#2563eb"
+                                                    strokeWidth={2}
+                                                    fillOpacity={1}
+                                                    fill="url(#colorPrice)"
+                                                />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
                                     </div>
 
                                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">

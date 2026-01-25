@@ -85,3 +85,9 @@ export const deleteCommodity = async (symbol) => {
     if (!response.ok) throw new Error("Failed to delete commodity");
     return response.json();
 };
+
+export const fetchCommodityHistory = async (symbol, days = 30) => {
+    const response = await fetch(`${API_URL}/api/commodities/${symbol}/history?days=${days}`);
+    if (!response.ok) throw new Error("Failed to fetch history");
+    return response.json();
+};

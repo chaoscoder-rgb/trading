@@ -24,7 +24,8 @@ class InsiderService:
                     params={
                         "symbol": search_symbol,
                         "token": self.api_key
-                    }
+                    },
+                    timeout=3.0
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -51,7 +52,8 @@ class InsiderService:
                     params={
                         "symbol": search_symbol,
                         "token": self.api_key
-                    }
+                    },
+                    timeout=3.0
                 )
                 if response.status_code == 200:
                     return response.json()

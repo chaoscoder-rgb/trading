@@ -82,6 +82,12 @@ async def delete_commodity(symbol: str, db = Depends(get_db)):
     
     return {"status": "success", "message": f"{symbol} removed"}
 
+@app.get("/api/commodities/{symbol}/history")
+async def get_commodity_history(symbol: str, days: int = 30):
+    prices = await data_engine.get_historical_prices(symbol, days)
+    # Return as list of objects for easy frontend charting
+    return [{"day": i, "price": p} for i, p in enumerate(prices)]
+
 @app.get("/api/commodities")
 async def get_commodities(background_tasks: BackgroundTasks, db = Depends(get_db)):
     # Get all commodities, newest first
