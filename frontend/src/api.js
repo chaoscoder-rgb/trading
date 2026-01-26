@@ -1,6 +1,6 @@
-console.log("Environment Check:", import.meta.env);
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-console.log("Using API_URL:", API_URL);
+// Hardcoded for production stability
+const API_URL = "https://trading-3t73.onrender.com";
+// const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const fetchCommodities = async () => {
     const response = await fetch(`${API_URL}/api/commodities`);
