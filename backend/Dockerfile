@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gfortran \
     libopenblas-dev \
     liblapack-dev \
+    llvm-dev \
+    python3-dev \
+    libgomp1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
