@@ -7,6 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
+    gfortran \
+    libopenblas-dev \
+    liblapack-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
