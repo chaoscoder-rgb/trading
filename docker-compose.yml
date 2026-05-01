@@ -1,0 +1,29 @@
+services:
+  database:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./libsql-data:/var/lib/sqld
+    restart: always
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - TURSO_DB_URL=http://database:8080
+      - TURSO_AUTH_TOKEN=
+    depends_on:
+      - database
+    restart: always
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: always

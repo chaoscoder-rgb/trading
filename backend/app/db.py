@@ -11,7 +11,10 @@ async def get_db():
     # Use async client for better compatibility on Windows (HTTP)
     url = TURSO_URL
     if url and url.startswith("libsql://"):
-        url = url.replace("libsql://", "https://")
+        if "turso.io" in url:
+            url = url.replace("libsql://", "https://")
+        else:
+            url = url.replace("libsql://", "http://")
         
     if not url:
         url = "file:trading.db"
@@ -24,7 +27,10 @@ async def init_db():
     print("Initializing Database (Async)...")
     url = TURSO_URL
     if url and url.startswith("libsql://"):
-        url = url.replace("libsql://", "https://")
+        if "turso.io" in url:
+            url = url.replace("libsql://", "https://")
+        else:
+            url = url.replace("libsql://", "http://")
     if not url: url = "file:trading.db"
 
     async with libsql_client.create_client(url, auth_token=TURSO_TOKEN) as client:
