@@ -1,0 +1,56 @@
+# CI — runs on GitHub's cloud for every push and PR on any branch.
+# Catches build breaks before they ever reach the home server.
+# (Same blueprint as Vamsha's ci.yml.)
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint (advisory)
+        run: npx eslint . || true
+        continue-on-error: true
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Full image build — the same thing the server will do on deploy,
+      # so a broken requirements.txt or Dockerfile fails HERE, not on the server.
+      # The layer cache makes repeat runs fast (the big pip install layer is reused).
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Syntax check all Python sources
+        run: python3 -m compileall -q backend

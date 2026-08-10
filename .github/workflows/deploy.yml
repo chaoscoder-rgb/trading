@@ -1,0 +1,42 @@
+# CD — deploys to the home server (192.168.1.18) on every push to main.
+# Runs on the SELF-HOSTED runner installed on the server itself (the runner
+# polls GitHub over outbound HTTPS, so no ports/router changes are needed).
+# One-time runner setup: bash deploy/setup-server.sh  (see DEPLOYMENT.md)
+#
+# The deploy script is idempotent: it reuses the existing .env and database,
+# rebuilds the containers, and finishes with the smoke-test suite — a failed
+# smoke test fails the workflow, so a broken deploy is visible on GitHub.
+# (Same blueprint as Vamsha's deploy.yml.)
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}   # manual "Run workflow" button on GitHub
+
+concurrency:
+  group: deploy-home-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync code to the app directory (preserves .env, database, backups)
+        run: |
+          rsync -a --delete \
+            --exclude='.env' \
+            --exclude='libsql-data/' \
+            --exclude='trading.db' \
+            --exclude='emails.txt' \
+            --exclude='node_modules/' \
+            --exclude='dist/' \
+            --exclude='.git/' \
+            ./ "$HOME/projects/Trading/"
+
+      - name: Deploy (build, start, smoke tests)
+        run: |
+          cd "$HOME/projects/Trading"
+          bash deploy/deploy-server.sh

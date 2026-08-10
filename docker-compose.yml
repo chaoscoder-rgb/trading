@@ -1,8 +1,10 @@
 services:
   database:
     image: ghcr.io/tursodatabase/libsql-server:latest
-    ports:
-      - "8080:8080"
+    # No host port: only the backend talks to the DB (via the compose network).
+    # Avoids clashing with anything else on the server using 8080.
+    expose:
+      - "8080"
     volumes:
       - ./libsql-data:/var/lib/sqld
     restart: always

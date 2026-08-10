@@ -16,3 +16,8 @@ node_modules/
 dist/
 build/
 .DS_Store
+
+# server-side data (never commit)
+libsql-data/
+backend/trading.db
+backend/emails.txt
