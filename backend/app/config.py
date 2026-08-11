@@ -52,6 +52,7 @@ kYUiuC4SPMoBrHPNiRHyha+lUQHluKayze6ldvigQQy2xeR1Jm/ctQ==
     # Email
     EMAIL_SENDER: str = ""
     EMAIL_PASSWORD: str = ""
+    EMAIL_FROM: str = ""
     SMTP_SERVER: str = ""
     SMTP_PORT: int = 587
     

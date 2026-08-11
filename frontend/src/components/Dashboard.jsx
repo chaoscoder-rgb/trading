@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory } from '../api';
+import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory, fetchStopLossSettings, saveStopLossSettings, setHoldingStopLoss, fetchAlerts, markAlertsRead, fetchStopLossHistory } from '../api';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
@@ -55,6 +55,52 @@ const Dashboard = () => {
     const [loadingHoldings, setLoadingHoldings] = useState(false);
     const [editingHolding, setEditingHolding] = useState(null); // null or holding object
 
+    // Stop-loss & alerts state
+    const [slSettings, setSlSettings] = useState(null);
+    const [showSlModal, setShowSlModal] = useState(false);
+    const [slDraft, setSlDraft] = useState(null);
+    const [slHistory, setSlHistory] = useState([]);
+    const [alerts, setAlerts] = useState([]);
+    const [showAlerts, setShowAlerts] = useState(false);
+    const unreadCount = alerts.filter(a => !a.read).length;
+
+    const loadAlerts = async () => {
+        try { setAlerts(await fetchAlerts()); } catch (e) { console.error(e); }
+    };
+
+    // Poll alerts every 60s so stop-loss warnings surface without a reload
+    useEffect(() => {
+        loadAlerts();
+        fetchStopLossSettings().then(setSlSettings).catch(console.error);
+        const t = setInterval(loadAlerts, 60000);
+        return () => clearInterval(t);
+    }, []);
+
+    const openAlerts = async () => {
+        const next = !showAlerts;
+        setShowAlerts(next);
+        if (next && unreadCount > 0) {
+            try { await markAlertsRead(); } catch (e) { console.error(e); }
+            setAlerts(prev => prev.map(a => ({ ...a, read: true })));
+        }
+    };
+
+    const saveSlSettingsDraft = async () => {
+        try {
+            const saved = await saveStopLossSettings({
+                enabled: slDraft.enabled,
+                default_pct: parseFloat(slDraft.default_pct),
+                auto_execute: slDraft.auto_execute,
+                pre_warning_ratio: parseFloat(slDraft.pre_warning_ratio),
+            });
+            setSlSettings(saved);
+            setShowSlModal(false);
+            loadHoldings();
+        } catch (e) {
+            alert("Failed to save stop-loss settings");
+        }
+    };
+
     // Initial Load
     useEffect(() => {
         loadData();
@@ -80,9 +126,10 @@ const Dashboard = () => {
     const loadHoldings = async () => {
         setLoadingHoldings(true);
         try {
-            const [data, hist] = await Promise.all([fetchHoldings(), fetchHistory()]);
+            const [data, hist, slh] = await Promise.all([fetchHoldings(), fetchHistory(), fetchStopLossHistory().catch(() => [])]);
             setHoldings(data);
             setHistory(hist);
+            setSlHistory(slh);
         } catch (err) {
             console.error("Fetch Holdings Error:", err);
         } finally {
@@ -152,6 +199,7 @@ const Dashboard = () => {
         try {
             if (editingHolding.id) {
                 await updateHolding(editingHolding.id, editingHolding);
+                await setHoldingStopLoss(editingHolding.id, editingHolding.stop_loss_pct ?? null);
             } else {
                 await createHolding(editingHolding);
             }
@@ -202,6 +250,7 @@ const Dashboard = () => {
         if (!editingHolding) return;
         try {
             await updateHolding(editingHolding.id, editingHolding);
+            await setHoldingStopLoss(editingHolding.id, editingHolding.stop_loss_pct ?? null);
             setEditingHolding(null);
             loadHoldings();
         } catch (err) {
@@ -216,6 +265,45 @@ const Dashboard = () => {
         <div className="container mx-auto p-4">
             <header className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">TradeVision</h1>
+                <div className="flex items-center gap-3">
+                {/* Alert Center */}
+                <div className="relative">
+                    <button
+                        onClick={openAlerts}
+                        className="relative p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+                        title="Alert Center"
+                    >
+                        <span className="text-xl">🔔</span>
+                        {unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                {unreadCount}
+                            </span>
+                        )}
+                    </button>
+                    {showAlerts && (
+                        <div className="absolute right-0 top-full mt-2 w-96 max-h-[420px] overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-2xl z-[80]">
+                            <div className="p-3 border-b border-gray-100 font-bold text-sm text-gray-700 flex justify-between items-center">
+                                <span>Alert Center</span>
+                                <button onClick={() => setShowAlerts(false)} className="text-gray-400 hover:text-black">✕</button>
+                            </div>
+                            {alerts.length === 0 ? (
+                                <div className="p-6 text-center text-sm text-gray-400 italic">No alerts yet. Stop-loss warnings and triggers will appear here.</div>
+                            ) : (
+                                alerts.map(a => (
+                                    <div key={a.id} className={`p-3 border-b border-gray-50 text-xs ${a.type === 'trigger' ? 'bg-red-50/50' : a.type === 'warning' ? 'bg-yellow-50/50' : ''}`}>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className={`font-black uppercase text-[10px] ${a.type === 'trigger' ? 'text-red-600' : a.type === 'warning' ? 'text-yellow-600' : 'text-gray-500'}`}>
+                                                {a.type === 'trigger' ? '⛔ Stop Triggered' : a.type === 'warning' ? '⚠️ Warning' : 'Info'} · {a.symbol}
+                                            </span>
+                                            <span className="text-[9px] text-gray-400">{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</span>
+                                        </div>
+                                        <div className="text-gray-700">{a.message}</div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
                 <div className="flex bg-gray-200 rounded-lg p-1">
                     <button
                         onClick={() => setActiveTab('market')}
@@ -229,6 +317,7 @@ const Dashboard = () => {
                     >
                         My Holdings
                     </button>
+                </div>
                 </div>
             </header>
 
@@ -791,12 +880,21 @@ const Dashboard = () => {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                             <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text">Portfolio Performance</h2>
-                            <button
-                                onClick={() => setEditingHolding({ symbol: '', quantity: 0, avg_price: 0 })}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
-                            >
-                                + Add Entry
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => { setSlDraft({ ...(slSettings || { enabled: true, default_pct: 10, auto_execute: false, pre_warning_ratio: 0.8 }) }); setShowSlModal(true); }}
+                                    className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-700 transition-colors"
+                                    title="Stop-loss configuration"
+                                >
+                                    🛡️ Stop Loss {slSettings ? `(${slSettings.default_pct}%${slSettings.enabled ? '' : ' · off'})` : ''}
+                                </button>
+                                <button
+                                    onClick={() => setEditingHolding({ symbol: '', quantity: 0, avg_price: 0 })}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
+                                >
+                                    + Add Entry
+                                </button>
+                            </div>
                         </div>
 
                         {loadingHoldings ? (
@@ -812,6 +910,7 @@ const Dashboard = () => {
                                         <th className="px-6 py-4 font-semibold text-right">Total Price</th>
                                         <th className="px-6 py-4 font-semibold text-right">Date and Time</th>
                                         <th className="px-6 py-4 font-semibold text-right">P&L</th>
+                                        <th className="px-6 py-4 font-semibold text-right">Stop Loss</th>
                                         <th className="px-6 py-4 font-semibold text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -863,6 +962,38 @@ const Dashboard = () => {
                                                 <td className={`px-6 py-4 text-right font-bold font-mono ${pnlClass}`}>
                                                     {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}
                                                 </td>
+
+                                                {/* Stop loss: effective %, distance-to-stop, inline override */}
+                                                <td className="px-6 py-4 text-right">
+                                                    {isEditing ? (
+                                                        <div className="flex justify-end items-center gap-1">
+                                                            <input
+                                                                type="number" min="1" max="50" step="0.5"
+                                                                placeholder={slSettings ? `${slSettings.default_pct}` : '10'}
+                                                                className="border rounded px-2 py-1 w-16 text-right"
+                                                                value={editingHolding.stop_loss_pct ?? ''}
+                                                                onChange={(e) => setEditingHolding({ ...editingHolding, stop_loss_pct: e.target.value === '' ? null : parseFloat(e.target.value) })}
+                                                            />
+                                                            <span className="text-xs text-gray-400">%</span>
+                                                        </div>
+                                                    ) : (() => {
+                                                        const stopPct = h.effective_stop_pct || slSettings?.default_pct || 10;
+                                                        const pnlPct = displayAvg > 0 && currentPrice > 0 ? ((currentPrice - displayAvg) / displayAvg) * 100 : 0;
+                                                        const distance = pnlPct + stopPct; // % of adverse move left before trigger
+                                                        const triggered = h.stop_state === 'triggered' || distance <= 0;
+                                                        const near = distance <= stopPct * 0.2;   // inside pre-warning band
+                                                        return (
+                                                            <div className="flex flex-col items-end gap-0.5">
+                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${triggered ? 'bg-red-600 text-white' : near ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                                    {stopPct}% {h.stop_loss_pct ? '(custom)' : ''}
+                                                                </span>
+                                                                <span className={`text-[10px] font-mono ${triggered ? 'text-red-600 font-bold' : near ? 'text-yellow-600' : 'text-gray-400'}`}>
+                                                                    {triggered ? 'TRIGGERED' : currentPrice > 0 ? `${distance.toFixed(1)}% to stop` : '—'}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </td>
                                                 <td className="px-6 py-4 text-right flex justify-end gap-2">
                                                     {isEditing ? (
                                                         <>
@@ -910,7 +1041,7 @@ const Dashboard = () => {
                                     })}
                                     {holdings.length === 0 && (
                                         <tr>
-                                            <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
+                                            <td colSpan="9" className="px-6 py-12 text-center text-gray-400">
                                                 No holdings found. Add a dummy entry to start.
                                             </td>
                                         </tr>
@@ -940,12 +1071,49 @@ const Dashboard = () => {
                                                 }, 0).toFixed(2)}
                                             </td>
                                             <td></td>
+                                            <td></td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         )}
                     </div>
+
+                    {/* Stop Loss Trigger History */}
+                    {slHistory.length > 0 && (
+                        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-gray-800">🛡️ Stop Loss Trigger History</h2>
+                                <span className="text-xs text-gray-400">{slHistory.length} trigger{slHistory.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-3 font-semibold">Symbol</th>
+                                        <th className="px-6 py-3 font-semibold text-right">Trigger Price</th>
+                                        <th className="px-6 py-3 font-semibold text-right">Loss %</th>
+                                        <th className="px-6 py-3 font-semibold">Action</th>
+                                        <th className="px-6 py-3 font-semibold text-right">When</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {slHistory.map(t => (
+                                        <tr key={t.trigger_id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-3 font-bold text-gray-800">{t.symbol}</td>
+                                            <td className="px-6 py-3 text-right font-mono">${(t.trigger_price || 0).toFixed(2)}</td>
+                                            <td className="px-6 py-3 text-right font-mono text-red-600 font-bold">{(t.loss_percentage || 0).toFixed(2)}%</td>
+                                            <td className="px-6 py-3">
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${t.action_taken === 'AUTO_SELL' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                    {t.action_taken === 'AUTO_SELL' ? 'Auto-sold' : 'Alert only'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-xs text-gray-500">{t.triggered_at ? new Date(t.triggered_at).toLocaleString() : '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
 
 
@@ -1057,6 +1225,71 @@ const Dashboard = () => {
 
 
 
+
+            {/* STOP LOSS SETTINGS MODAL */}
+            {showSlModal && slDraft && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[65]">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="p-4 bg-gray-800 text-white font-bold flex justify-between items-center">
+                            <span className="text-lg">🛡️ Stop Loss Configuration</span>
+                            <button onClick={() => setShowSlModal(false)} className="opacity-70 hover:opacity-100">✕</button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <label className="flex items-center justify-between cursor-pointer">
+                                <div>
+                                    <div className="font-semibold text-gray-800">Stop-loss monitoring</div>
+                                    <div className="text-xs text-gray-500">Background checks on all open positions</div>
+                                </div>
+                                <input type="checkbox" className="w-5 h-5 accent-blue-600"
+                                    checked={!!slDraft.enabled}
+                                    onChange={(e) => setSlDraft({ ...slDraft, enabled: e.target.checked })} />
+                            </label>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Default stop loss: <span className="font-black">{slDraft.default_pct}%</span>
+                                </label>
+                                <input type="range" min="1" max="50" step="0.5"
+                                    className="w-full accent-blue-600"
+                                    value={slDraft.default_pct}
+                                    onChange={(e) => setSlDraft({ ...slDraft, default_pct: parseFloat(e.target.value) })} />
+                                <div className="flex justify-between text-[10px] text-gray-400">
+                                    <span>1% (tight)</span><span>10% (recommended)</span><span>50% (loose)</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">Applies to every position without a custom override.</div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Early warning at <span className="font-black">{Math.round(slDraft.pre_warning_ratio * 100)}%</span> of the stop
+                                    <span className="text-gray-400 font-normal"> ({(slDraft.default_pct * slDraft.pre_warning_ratio).toFixed(1)}% loss)</span>
+                                </label>
+                                <input type="range" min="0.5" max="0.95" step="0.05"
+                                    className="w-full accent-yellow-500"
+                                    value={slDraft.pre_warning_ratio}
+                                    onChange={(e) => setSlDraft({ ...slDraft, pre_warning_ratio: parseFloat(e.target.value) })} />
+                            </div>
+
+                            <label className="flex items-center justify-between cursor-pointer border-t pt-4">
+                                <div>
+                                    <div className="font-semibold text-gray-800">Auto-execute (paper)</div>
+                                    <div className="text-xs text-gray-500">Automatically close the position when the stop hits. Off = alert only, you decide.</div>
+                                </div>
+                                <input type="checkbox" className="w-5 h-5 accent-red-600"
+                                    checked={!!slDraft.auto_execute}
+                                    onChange={(e) => setSlDraft({ ...slDraft, auto_execute: e.target.checked })} />
+                            </label>
+
+                            <button
+                                onClick={saveSlSettingsDraft}
+                                className="w-full py-3 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg transition-transform hover:scale-[1.01] active:scale-95"
+                            >
+                                SAVE CONFIGURATION
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* TRADE MODAL */}
             {

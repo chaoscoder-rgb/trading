@@ -81,6 +81,54 @@ async def init_db():
                 )
             """)
             
+            # Stop-loss: per-position overrides + monitor state on holdings.
+            # ALTER TABLE is idempotent-by-catch: fails harmlessly if the
+            # column already exists.
+            for ddl in [
+                "ALTER TABLE holdings ADD COLUMN stop_loss_pct REAL",
+                "ALTER TABLE holdings ADD COLUMN stop_state TEXT DEFAULT 'active'",
+            ]:
+                try:
+                    await client.execute(ddl)
+                except Exception:
+                    pass  # column already exists
+
+            # Global app settings (key/value)
+            await client.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+
+            # Stop-loss trigger log (schema from the requirements doc)
+            await client.execute("""
+                CREATE TABLE IF NOT EXISTS stop_loss_triggers (
+                    trigger_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    position_id INTEGER,
+                    symbol TEXT,
+                    trigger_price REAL,
+                    loss_percentage REAL,
+                    triggered_at DATETIME,
+                    action_taken TEXT,
+                    market_conditions TEXT,
+                    was_profitable INTEGER,
+                    learning_data TEXT
+                )
+            """)
+
+            # In-app alert center
+            await client.execute("""
+                CREATE TABLE IF NOT EXISTS alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT,            -- warning | trigger | info
+                    symbol TEXT,
+                    message TEXT,
+                    created_at DATETIME,
+                    read INTEGER DEFAULT 0
+                )
+            """)
+
             # Recommendation History (for Self-Correction/Backtesting)
             await client.execute("""
                 CREATE TABLE IF NOT EXISTS recommendation_history (

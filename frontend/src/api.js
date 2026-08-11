@@ -93,3 +93,49 @@ export const fetchCommodityHistory = async (symbol, days = 30) => {
     if (!response.ok) throw new Error("Failed to fetch history");
     return response.json();
 };
+
+// ---- Stop-loss & alerts ----
+
+export const fetchStopLossSettings = async () => {
+    const response = await fetch(`${API_URL}/api/settings/stop-loss`);
+    if (!response.ok) throw new Error("Failed to fetch stop-loss settings");
+    return response.json();
+};
+
+export const saveStopLossSettings = async (settings) => {
+    const response = await fetch(`${API_URL}/api/settings/stop-loss`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+    });
+    if (!response.ok) throw new Error("Failed to save stop-loss settings");
+    return response.json();
+};
+
+export const setHoldingStopLoss = async (id, stopLossPct) => {
+    const response = await fetch(`${API_URL}/api/holdings/${id}/stop-loss`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stop_loss_pct: stopLossPct }),
+    });
+    if (!response.ok) throw new Error("Failed to set stop loss");
+    return response.json();
+};
+
+export const fetchAlerts = async () => {
+    const response = await fetch(`${API_URL}/api/alerts`);
+    if (!response.ok) throw new Error("Failed to fetch alerts");
+    return response.json();
+};
+
+export const markAlertsRead = async () => {
+    const response = await fetch(`${API_URL}/api/alerts/mark-read`, { method: "POST" });
+    if (!response.ok) throw new Error("Failed to mark alerts read");
+    return response.json();
+};
+
+export const fetchStopLossHistory = async () => {
+    const response = await fetch(`${API_URL}/api/stop-loss/history`);
+    if (!response.ok) throw new Error("Failed to fetch stop-loss history");
+    return response.json();
+};

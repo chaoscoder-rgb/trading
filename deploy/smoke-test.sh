@@ -23,6 +23,12 @@ check "trade history API"           200 "$(code "$API_URL/api/history")"
 check "commodities API"             200 "$(code "$API_URL/api/commodities")"
 check "price history API"           200 "$(code "$API_URL/api/commodities/GC/history?days=7")"
 
+# Stop-loss system
+check "stop-loss settings API"      200 "$(code "$API_URL/api/settings/stop-loss")"
+check "alerts API"                  200 "$(code "$API_URL/api/alerts")"
+check "stop-loss history API"       200 "$(code "$API_URL/api/stop-loss/history")"
+check "manual stop-loss check"      200 "$(code -X POST "$API_URL/api/stop-loss/check-now")"
+
 # Through the frontend nginx (what the browser actually uses)
 check "frontend loads"              200 "$(code "$BASE_URL/")"
 check "frontend /api proxy works"   200 "$(code "$BASE_URL/api/holdings")"

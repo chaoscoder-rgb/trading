@@ -28,6 +28,9 @@ app.add_middleware(
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+    # Start the stop-loss background monitor
+    from app.services.stop_loss import stop_loss_service
+    stop_loss_service.start()
 
 # 4. Models
 class CommodityRequest(BaseModel):
@@ -44,6 +47,16 @@ class TradeRequest(BaseModel):
     action: str # BUY/SELL
     amount: float
     price: float
+
+class StopLossSettingsRequest(BaseModel):
+    enabled: Optional[bool] = None
+    default_pct: Optional[float] = None
+    auto_execute: Optional[bool] = None
+    pre_warning_ratio: Optional[float] = None
+    check_interval_sec: Optional[int] = None
+
+class HoldingStopLossRequest(BaseModel):
+    stop_loss_pct: Optional[float] = None  # null clears the override -> global default
 
 # Helper to dict
 def row_to_dict(cols, row):
@@ -173,7 +186,11 @@ async def log_recommendation(symbol: str, action: str, price: float, confidence:
 
 @app.get("/api/holdings")
 async def get_holdings(db = Depends(get_db)):
-    rs = await db.execute("SELECT id, symbol, quantity, avg_price, last_updated FROM holdings")
+    from app.services.stop_loss import stop_loss_service
+    sl_settings = await stop_loss_service.get_settings(db)
+    rs = await db.execute(
+        "SELECT id, symbol, quantity, avg_price, last_updated, stop_loss_pct, stop_state FROM holdings"
+    )
     holdings = []
     for row in rs.rows:
         holdings.append({
@@ -181,16 +198,99 @@ async def get_holdings(db = Depends(get_db)):
             "symbol": row[1],
             "quantity": row[2],
             "avg_price": row[3],
-            "last_updated": row[4]
+            "last_updated": row[4],
+            "stop_loss_pct": row[5],   # null => global default applies
+            "stop_state": row[6] or "active",
+            "effective_stop_pct": row[5] if row[5] else sl_settings["default_pct"],
         })
     return holdings
+
+# ---- Stop-loss configuration & alerts ----
+
+@app.get("/api/settings/stop-loss")
+async def get_stop_loss_settings(db = Depends(get_db)):
+    from app.services.stop_loss import stop_loss_service
+    return await stop_loss_service.get_settings(db)
+
+@app.put("/api/settings/stop-loss")
+async def update_stop_loss_settings(req: StopLossSettingsRequest, db = Depends(get_db)):
+    from app.services.stop_loss import stop_loss_service
+    updates = {k: v for k, v in req.dict().items() if v is not None}
+    return await stop_loss_service.save_settings(db, updates)
+
+@app.put("/api/holdings/{id}/stop-loss")
+async def update_holding_stop_loss(id: int, req: HoldingStopLossRequest, db = Depends(get_db)):
+    pct = req.stop_loss_pct
+    if pct is not None:
+        pct = min(50.0, max(1.0, float(pct)))
+    # Changing the stop re-arms monitoring for this position
+    await db.execute(
+        "UPDATE holdings SET stop_loss_pct = ?, stop_state = 'active' WHERE id = ?",
+        [pct, id],
+    )
+    return {"status": "success", "stop_loss_pct": pct}
+
+@app.get("/api/alerts")
+async def get_alerts(limit: int = 30, db = Depends(get_db)):
+    rs = await db.execute(
+        "SELECT id, type, symbol, message, created_at, read FROM alerts "
+        "ORDER BY id DESC LIMIT ?", [limit]
+    )
+    return [
+        {"id": r[0], "type": r[1], "symbol": r[2], "message": r[3],
+         "created_at": r[4], "read": bool(r[5])}
+        for r in rs.rows
+    ]
+
+@app.post("/api/alerts/mark-read")
+async def mark_alerts_read(db = Depends(get_db)):
+    await db.execute("UPDATE alerts SET read = 1 WHERE read = 0")
+    return {"status": "success"}
+
+@app.get("/api/stop-loss/history")
+async def get_stop_loss_history(limit: int = 50, db = Depends(get_db)):
+    rs = await db.execute(
+        "SELECT trigger_id, symbol, trigger_price, loss_percentage, triggered_at, "
+        "action_taken, market_conditions FROM stop_loss_triggers "
+        "ORDER BY trigger_id DESC LIMIT ?", [limit]
+    )
+    return [
+        {"trigger_id": r[0], "symbol": r[1], "trigger_price": r[2],
+         "loss_percentage": r[3], "triggered_at": r[4], "action_taken": r[5],
+         "market_conditions": r[6]}
+        for r in rs.rows
+    ]
+
+@app.post("/api/stop-loss/check-now")
+async def run_stop_loss_check(db = Depends(get_db)):
+    """Manual monitor pass — handy for testing and the smoke suite."""
+    from app.services.stop_loss import stop_loss_service
+    actions = await stop_loss_service.check_positions(db)
+    return {"status": "success", "actions": [{"action": a, "symbol": s} for a, s in actions]}
+
+@app.post("/api/holdings")
+async def create_holding(holding: HoldingRequest, db = Depends(get_db)):
+    # (Endpoint was missing — the UI's "+ Add Entry" called it and got a 405.)
+    timestamp = datetime.utcnow()
+    rs = await db.execute("SELECT id FROM holdings WHERE symbol = ?", [holding.symbol])
+    if rs.rows:
+        await db.execute(
+            "UPDATE holdings SET quantity = ?, avg_price = ?, last_updated = ?, stop_state = 'active' WHERE id = ?",
+            [holding.quantity, holding.avg_price, timestamp, rs.rows[0][0]]
+        )
+    else:
+        await db.execute(
+            "INSERT INTO holdings (symbol, quantity, avg_price, last_updated) VALUES (?, ?, ?, ?)",
+            [holding.symbol, holding.quantity, holding.avg_price, timestamp]
+        )
+    return {"status": "success"}
 
 @app.put("/api/holdings/{id}")
 async def update_holding(id: int, holding: HoldingRequest, db = Depends(get_db)):
     # Update quantity and avg_price
     timestamp = datetime.utcnow()
     await db.execute(
-        "UPDATE holdings SET quantity = ?, avg_price = ?, last_updated = ? WHERE id = ?",
+        "UPDATE holdings SET quantity = ?, avg_price = ?, last_updated = ?, stop_state = 'active' WHERE id = ?",
         [holding.quantity, holding.avg_price, timestamp, id]
     )
     return {"status": "success", "message": "Holding updated"}
@@ -233,7 +333,7 @@ async def execute_trade(trade: TradeRequest, background_tasks: BackgroundTasks, 
             new_avg = ((current_qty * current_avg) + total_cost) / total_qty
             
             await db.execute(
-                "UPDATE holdings SET quantity = ?, avg_price = ?, last_updated = ? WHERE id = ?",
+                "UPDATE holdings SET quantity = ?, avg_price = ?, last_updated = ?, stop_state = 'active' WHERE id = ?",
                 [total_qty, new_avg, timestamp, holding[0]]
             )
         else:

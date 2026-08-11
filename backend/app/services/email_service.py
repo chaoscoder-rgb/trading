@@ -52,11 +52,57 @@ class EmailService:
             msg['Subject'] = subject
             msg.attach(MIMEText(body, 'plain'))
 
-            server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
+            server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=10)
             server.starttls()
             server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
             text = msg.as_string()
             server.sendmail(settings.EMAIL_FROM, recipient, text)
+            server.quit()
+            print(f"--- REAL EMAIL SENT TO {recipient} ---")
+            return True
+        except Exception as e:
+            print(f"Failed to send real email: {e}")
+            self._log_to_file(recipient, subject, body)
+            return False
+
+    def send_stop_loss_alert(self, symbol, entry_price, current_price, loss_pct, stop_pct, mode):
+        """Stop-loss trigger notification (spec section 3C)."""
+        recipient = "Dinakar.anumolu@zohomail.com"
+        subject = f"⚠️ STOP LOSS ALERT: {symbol} down {abs(loss_pct):.1f}%"
+        body = f"""
+        ⚠️ STOP LOSS ALERT ⚠️
+
+        Position:          {symbol}
+        Entry Price:       ${entry_price:.2f}
+        Current Price:     ${current_price:.2f}
+        Loss:              {loss_pct:.2f}%
+        Stop Loss Trigger: {stop_pct:.0f}%
+
+        Action: {'Auto-Sell Executed (paper)' if mode == 'AUTO_SELL' else 'Manual Review Required'}
+        Time:   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        """
+        return self._send(recipient, subject, body)
+
+    def _send(self, recipient, subject, body):
+        from app.config import settings
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        if not settings.EMAIL_SENDER or not settings.EMAIL_PASSWORD:
+            print("Email credentials missing. Logging to file only.")
+            self._log_to_file(recipient, subject, body)
+            return False
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = settings.EMAIL_FROM
+            msg['To'] = recipient
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain'))
+            server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=10)
+            server.starttls()
+            server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
+            server.sendmail(settings.EMAIL_FROM, recipient, msg.as_string())
             server.quit()
             print(f"--- REAL EMAIL SENT TO {recipient} ---")
             return True
