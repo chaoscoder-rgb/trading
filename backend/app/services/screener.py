@@ -167,6 +167,17 @@ class ScreenerService:
                         ti_score += 20 if price > sma else -20
                     ti_score = max(0, min(100, ti_score))
 
+                    # --- risk from 30-day volatility (same tiers as live engine) ---
+                    import math
+                    recent = closes[-30:]
+                    rets = [(recent[j] - recent[j-1]) / recent[j-1] for j in range(1, len(recent)) if recent[j-1]]
+                    if len(rets) >= 2:
+                        mean = sum(rets) / len(rets)
+                        vol = math.sqrt(sum((r - mean) ** 2 for r in rets) / len(rets)) * 100
+                    else:
+                        vol = 0.0
+                    risk_level = "Low" if vol < 1.0 else ("Medium" if vol < 2.0 else "High")
+
                     # --- news score (Finnhub; paced) ---
                     news_score = 50.0
                     if analytics_engine.api_key:
@@ -193,8 +204,8 @@ class ScreenerService:
                             """INSERT INTO screener_scores
                                (symbol, name, sector, price, change_percent, confidence, action,
                                 ti_score, news_score, pm_score, macro_score, political_status,
-                                pm_favor, kalshi_favor, updated_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                pm_favor, kalshi_favor, risk_level, volatility, updated_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                ON CONFLICT(symbol) DO UPDATE SET
                                  name=excluded.name, sector=excluded.sector, price=excluded.price,
                                  change_percent=excluded.change_percent, confidence=excluded.confidence,
@@ -202,12 +213,14 @@ class ScreenerService:
                                  news_score=excluded.news_score, pm_score=excluded.pm_score,
                                  macro_score=excluded.macro_score, political_status=excluded.political_status,
                                  pm_favor=excluded.pm_favor, kalshi_favor=excluded.kalshi_favor,
+                                 risk_level=excluded.risk_level, volatility=excluded.volatility,
                                  updated_at=excluded.updated_at""",
                             [sym, name, s.get("sector"), price, round(change_pct, 2),
                              round(confidence, 1), action, round(ti_score, 1), round(news_score, 1),
                              round(pm_score, 1), macro_score, political,
                              None if pm_yes is None else int(pm_yes > 50),
                              None if ks_yes is None else int(ks_yes > 50),
+                             risk_level, round(vol, 2),
                              datetime.utcnow().isoformat()],
                         )
                         break
@@ -252,19 +265,21 @@ class ScreenerService:
     # --------------------------------------------------------------- query
 
     async def query(self, db, universe: str, min_confidence=None,
-                    political=False, polymarket=False, kalshi=False, limit=100):
+                    political=False, polymarket=False, kalshi=False,
+                    risk_levels=None, actions=None, limit=100):
         members = {s["symbol"] for s in self.universe_symbols(universe)}
         if not members:
             return {"results": [], "universe": universe, "error": "unknown universe"}
 
         rs = await db.execute(
             "SELECT symbol, name, sector, price, change_percent, confidence, action, "
-            "political_status, pm_favor, kalshi_favor, updated_at FROM screener_scores"
+            "political_status, pm_favor, kalshi_favor, risk_level, volatility, updated_at "
+            "FROM screener_scores"
         )
         results = []
         for r in rs.rows:
             (sym, name, sector, price, chg, conf, action, political_status,
-             pm_favor, kalshi_favor, updated_at) = r
+             pm_favor, kalshi_favor, risk_level, volatility, updated_at) = r
             if sym not in members:
                 continue
             if min_confidence is not None and (conf is None or conf < min_confidence):
@@ -275,11 +290,16 @@ class ScreenerService:
                 continue
             if kalshi and kalshi_favor != 1:
                 continue
+            if risk_levels and (risk_level or "") not in risk_levels:
+                continue
+            if actions and (action or "") not in actions:
+                continue
             results.append({
                 "symbol": sym, "name": name, "sector": sector, "price": price,
                 "change_percent": chg, "confidence": conf, "action": action,
                 "political_status": political_status,
                 "pm_favor": pm_favor, "kalshi_favor": kalshi_favor,
+                "risk_level": risk_level, "volatility": volatility,
                 "updated_at": updated_at,
             })
         results.sort(key=lambda x: -(x["confidence"] or 0))

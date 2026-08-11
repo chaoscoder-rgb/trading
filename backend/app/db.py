@@ -146,9 +146,21 @@ async def init_db():
                     political_status TEXT,
                     pm_favor INTEGER,
                     kalshi_favor INTEGER,
+                    risk_level TEXT,
+                    volatility REAL,
                     updated_at DATETIME
                 )
             """)
+
+            # Upgrade path for servers whose screener_scores predates risk columns
+            for ddl in [
+                "ALTER TABLE screener_scores ADD COLUMN risk_level TEXT",
+                "ALTER TABLE screener_scores ADD COLUMN volatility REAL",
+            ]:
+                try:
+                    await client.execute(ddl)
+                except Exception:
+                    pass
 
             # Recommendation History (for Self-Correction/Backtesting)
             await client.execute("""

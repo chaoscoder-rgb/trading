@@ -193,9 +193,13 @@ async def log_recommendation(symbol: str, action: str, price: float, confidence:
 @app.get("/api/screener")
 async def run_screener(universe: str = "sp500", min_confidence: Optional[float] = None,
                        political: bool = False, polymarket: bool = False,
-                       kalshi: bool = False, db = Depends(get_db)):
+                       kalshi: bool = False, risk: Optional[str] = None,
+                       action: Optional[str] = None, db = Depends(get_db)):
     from app.services.screener import screener_service
-    return await screener_service.query(db, universe, min_confidence, political, polymarket, kalshi)
+    risk_levels = [r.strip() for r in risk.split(",") if r.strip()] if risk else None
+    actions = [a.strip() for a in action.split(",") if a.strip()] if action else None
+    return await screener_service.query(db, universe, min_confidence, political,
+                                        polymarket, kalshi, risk_levels, actions)
 
 @app.get("/api/screener/universes")
 async def get_screener_universes():

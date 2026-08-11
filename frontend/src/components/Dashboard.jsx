@@ -70,13 +70,46 @@ const Dashboard = () => {
     const [editingHolding, setEditingHolding] = useState(null); // null or holding object
 
     // Screener state — combinable filters; universe = watchlist (live) or an index (precomputed)
-    const [screener, setScreener] = useState({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false });
+    const [screener, setScreener] = useState({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false, risk: [], actions: [] });
     const [showScreener, setShowScreener] = useState(false);
     const [screenerResults, setScreenerResults] = useState(null); // index-universe results
     const [screenerStatus, setScreenerStatus] = useState(null);
     const [screenerLoading, setScreenerLoading] = useState(false);
-    const screenerActive = screener.minConfidence !== '' || screener.political || screener.polymarket || screener.kalshi;
+    const [openDropdown, setOpenDropdown] = useState(null); // 'risk' | 'actions' | null
+    const screenerActive = screener.minConfidence !== '' || screener.political || screener.polymarket || screener.kalshi || screener.risk.length > 0 || screener.actions.length > 0;
     const indexMode = screener.universe !== 'watchlist';
+
+    const RISK_OPTIONS = ['Low', 'Medium', 'High'];
+    const ACTION_OPTIONS = ['Strong Buy', 'Buy', 'Hold', 'Sell', 'Strong Sell'];
+    const toggleMulti = (field, value) => {
+        setScreener(prev => ({
+            ...prev,
+            [field]: prev[field].includes(value) ? prev[field].filter(v => v !== value) : [...prev[field], value],
+        }));
+    };
+
+    const MultiSelect = ({ id, label, options, selected }) => (
+        <div className="relative">
+            <button
+                onClick={() => setOpenDropdown(openDropdown === id ? null : id)}
+                className={`border rounded-lg px-3 py-1.5 text-sm font-medium flex items-center gap-2 ${selected.length ? 'border-blue-400 bg-blue-50 text-blue-700' : 'bg-white text-gray-700'}`}
+            >
+                {label}{selected.length > 0 && <span className="bg-blue-600 text-white text-[10px] font-black rounded-full px-1.5">{selected.length}</span>}
+                <span className="text-[9px]">▼</span>
+            </button>
+            {openDropdown === id && (
+                <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-[75] min-w-[150px] py-1">
+                    {options.map(opt => (
+                        <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
+                            <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                                checked={selected.includes(opt)} onChange={() => toggleMulti(id, opt)} />
+                            {opt}
+                        </label>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 
     // Query precomputed index scores whenever filters change in index mode
     useEffect(() => {
@@ -88,7 +121,8 @@ const Dashboard = () => {
             .catch(err => { console.error(err); if (!cancelled) setScreenerResults({ results: [], matched: 0 }); })
             .finally(() => { if (!cancelled) setScreenerLoading(false); });
         return () => { cancelled = true; };
-    }, [screener.universe, screener.minConfidence, screener.political, screener.polymarket, screener.kalshi]);
+    }, [screener.universe, screener.minConfidence, screener.political, screener.polymarket, screener.kalshi,
+        JSON.stringify(screener.risk), JSON.stringify(screener.actions)]);
 
     const handleWatchFromScreener = async (row) => {
         try {
@@ -126,6 +160,8 @@ const Dashboard = () => {
             const yes = avgYes(rec.kalshi, 'yes_price');
             if (yes === null || yes <= 50) return false;
         }
+        if (screener.risk.length > 0 && !screener.risk.includes(item.risk?.level)) return false;
+        if (screener.actions.length > 0 && !screener.actions.includes(rec.action)) return false;
         return true;
     };
 
@@ -480,6 +516,7 @@ const Dashboard = () => {
                                 >
                                     <option value="watchlist">My Watchlist (live)</option>
                                     <option value="sp500">S&P 500</option>
+                                    <option value="nasdaq100">Nasdaq-100</option>
                                     <option value="dow30">Dow Jones 30</option>
                                 </select>
                             </div>
@@ -492,6 +529,8 @@ const Dashboard = () => {
                                     onChange={(e) => setScreener({ ...screener, minConfidence: e.target.value })}
                                 />
                             </div>
+                            <MultiSelect id="risk" label="⚠️ Risk" options={RISK_OPTIONS} selected={screener.risk} />
+                            <MultiSelect id="actions" label="🎯 Recommendation" options={ACTION_OPTIONS} selected={screener.actions} />
                             {[
                                 ['political', '🏛️ Political Flow: Bullish'],
                                 ['polymarket', '📊 Polymarket: In favor'],
@@ -508,7 +547,7 @@ const Dashboard = () => {
                             ))}
                             {(screenerActive || indexMode) && (
                                 <button
-                                    onClick={() => setScreener({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false })}
+                                    onClick={() => { setScreener({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false, risk: [], actions: [] }); setOpenDropdown(null); }}
                                     className="ml-auto text-xs font-bold text-red-500 hover:text-red-700 uppercase"
                                 >
                                     ✕ Reset
@@ -573,6 +612,14 @@ const Dashboard = () => {
                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${(row.action || '').includes('Buy') ? 'bg-green-100 text-green-700' :
                                                 (row.action || '').includes('Sell') ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
                                                 {row.action}
+                                            </span>
+                                        </div>
+                                        <div className="w-16 text-center">
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${row.risk_level === 'High' ? 'bg-red-100 text-red-700' :
+                                                row.risk_level === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                                row.risk_level === 'Low' ? 'bg-green-100 text-green-700' : 'bg-gray-50 text-gray-400'}`}
+                                                title={row.volatility != null ? `30-day volatility ${row.volatility}%` : ''}>
+                                                {row.risk_level || '—'}
                                             </span>
                                         </div>
                                         <div className="flex gap-1 w-20 justify-center">
