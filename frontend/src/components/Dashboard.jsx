@@ -69,6 +69,35 @@ const Dashboard = () => {
     const [loadingHoldings, setLoadingHoldings] = useState(false);
     const [editingHolding, setEditingHolding] = useState(null); // null or holding object
 
+    // Screener state — combinable filters over the loaded watchlist
+    const [screener, setScreener] = useState({ minConfidence: '', political: false, polymarket: false, kalshi: false });
+    const [showScreener, setShowScreener] = useState(false);
+    const screenerActive = screener.minConfidence !== '' || screener.political || screener.polymarket || screener.kalshi;
+
+    const avgYes = (items, key) => {
+        if (!items || items.length === 0) return null;
+        const vals = items.map(m => parseFloat(m[key])).filter(v => !isNaN(v));
+        if (vals.length === 0) return null;
+        return vals.reduce((a, b) => a + b, 0) / vals.length;
+    };
+
+    const matchesScreener = (item) => {
+        const rec = item.recommendation || {};
+        if (screener.minConfidence !== '' && !(parseFloat(rec.confidence) >= parseFloat(screener.minConfidence))) return false;
+        if (screener.political && !(rec.unusual_flow?.political_status || '').includes('Bullish')) return false;
+        if (screener.polymarket) {
+            const yes = avgYes(rec.polls, 'yes');
+            if (yes === null || yes <= 50) return false;
+        }
+        if (screener.kalshi) {
+            const yes = avgYes(rec.kalshi, 'yes_price');
+            if (yes === null || yes <= 50) return false;
+        }
+        return true;
+    };
+
+    const visibleCommodities = screenerActive ? commodities.filter(matchesScreener) : commodities;
+
     // Stop-loss & alerts state
     const [slSettings, setSlSettings] = useState(null);
     const [showSlModal, setShowSlModal] = useState(false);
@@ -383,13 +412,66 @@ const Dashboard = () => {
 
             {/* Sub-header for Market Tab */}
             {activeTab === 'market' && (
-                <div className="flex justify-end mb-4">
-                    <button
-                        onClick={() => setShowSearchModal(true)}
-                        className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-gray-700 transition"
-                    >
-                        + Add Symbol
-                    </button>
+                <div className="mb-4">
+                    <div className="flex justify-between items-center">
+                        <button
+                            onClick={() => setShowScreener(!showScreener)}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-2
+                                ${screenerActive ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                        >
+                            🔍 Screener
+                            {screenerActive && (
+                                <span className="bg-white/25 px-2 py-0.5 rounded text-xs">
+                                    {visibleCommodities.length}/{commodities.length}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setShowSearchModal(true)}
+                            className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-gray-700 transition"
+                        >
+                            + Add Symbol
+                        </button>
+                    </div>
+
+                    {showScreener && (
+                        <div className="mt-3 bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-wrap items-center gap-x-6 gap-y-3">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 uppercase">AI Confidence ≥</span>
+                                <input
+                                    type="number" min="0" max="100" placeholder="e.g. 60"
+                                    className="border rounded-lg px-3 py-1.5 w-24 text-sm font-mono"
+                                    value={screener.minConfidence}
+                                    onChange={(e) => setScreener({ ...screener, minConfidence: e.target.value })}
+                                />
+                            </div>
+                            {[
+                                ['political', '🏛️ Political Flow: Bullish'],
+                                ['polymarket', '📊 Polymarket: In favor'],
+                                ['kalshi', '📈 Kalshi: In favor'],
+                            ].map(([key, label]) => (
+                                <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox" className="w-4 h-4 accent-blue-600"
+                                        checked={screener[key]}
+                                        onChange={(e) => setScreener({ ...screener, [key]: e.target.checked })}
+                                    />
+                                    <span className="text-sm font-medium text-gray-700">{label}</span>
+                                </label>
+                            ))}
+                            {screenerActive && (
+                                <button
+                                    onClick={() => setScreener({ minConfidence: '', political: false, polymarket: false, kalshi: false })}
+                                    className="ml-auto text-xs font-bold text-red-500 hover:text-red-700 uppercase"
+                                >
+                                    ✕ Clear filters
+                                </button>
+                            )}
+                            <div className="w-full text-[10px] text-gray-400">
+                                "In favor" = average yes-probability across related prediction markets &gt; 50%. Filters apply to your watchlist.
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -398,7 +480,12 @@ const Dashboard = () => {
                 <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-200px)] min-h-[600px]">
                     {/* LEFT: Master List */}
                     <div className="lg:w-[350px] flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar shrink-0">
-                        {commodities.map((item) => (
+                        {screenerActive && visibleCommodities.length === 0 && (
+                            <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-400">
+                                No symbols match the current filters.
+                            </div>
+                        )}
+                        {visibleCommodities.map((item) => (
                             <div
                                 key={item.symbol}
                                 className={`border rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer bg-white relative overflow-hidden group shrink-0
