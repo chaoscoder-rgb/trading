@@ -100,12 +100,20 @@ async def delete_commodity(symbol: str, db = Depends(get_db)):
 
 @app.get("/api/commodities/{symbol}/history")
 async def get_commodity_history(symbol: str, days: int = 30):
-    # Always fetch >= a year of bars so the 52-week band can be computed from
-    # the SAME series the chart displays (independent of the selected range).
+    """
+    days = CALENDAR days back from today. Bars are filtered by date, not
+    sliced by count — a bar count treats 30 as ~6 weeks of trading days and
+    made YTD reach back a full year.
+    """
+    from datetime import date, timedelta
     full = await data_engine.get_historical_prices(symbol, max(days, 365))
-    closes = [h["close"] for h in full if h.get("close") is not None]
-    year = closes[-365:] if len(closes) > 365 else closes
-    sliced = full[-days:] if days < len(full) else full
+
+    # 52-week band from the last 365 CALENDAR days of the same series
+    year_cutoff = (date.today() - timedelta(days=365)).isoformat()
+    year = [h["close"] for h in full if h.get("close") is not None and h["date"] >= year_cutoff]
+
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    sliced = [h for h in full if h["date"] >= cutoff]
     return {
         "history": [{"date": h["date"], "price": h["close"]} for h in sliced],
         "week52_high": round(max(year), 2) if year else None,

@@ -11,6 +11,24 @@ const Dashboard = () => {
     const [selectedCommodity, setSelectedCommodity] = useState(null);
     const [historyData, setHistoryData] = useState([]); // Chart data
     const [wk52, setWk52] = useState(null); // {high, low} — 52-week band for the chart
+
+    // Decide whether the 52W lines can be drawn without wrecking the scale.
+    // A line is drawn only if it sits within a tolerance of the visible data
+    // range; otherwise its value is shown as a chip above the chart instead.
+    const chartScale = React.useMemo(() => {
+        const prices = historyData.map(h => h.price).filter(v => typeof v === 'number' && isFinite(v));
+        if (!prices.length) return null;
+        const dMin = Math.min(...prices), dMax = Math.max(...prices);
+        const span = Math.max(dMax - dMin, dMax * 0.02); // guard for flat series
+        const tol = Math.max(span * 0.75, dMax * 0.15);
+        const showHigh = wk52 != null && wk52.high <= dMax + tol;
+        const showLow = wk52 != null && wk52.low >= dMin - tol;
+        return {
+            showHigh, showLow,
+            yMin: (showLow && wk52 ? Math.min(dMin, wk52.low) : dMin) * 0.995,
+            yMax: (showHigh && wk52 ? Math.max(dMax, wk52.high) : dMax) * 1.005,
+        };
+    }, [historyData, wk52]);
     const [timeRange, setTimeRange] = useState('1M'); // Time range state
 
     const [tradeAmount, setTradeAmount] = useState(100);
@@ -20,14 +38,15 @@ const Dashboard = () => {
     const [showSearchModal, setShowSearchModal] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
 
+    // Calendar-day ranges. 1D dropped (EOD data = a single point); 3Y/5Y
+    // replaced by Max — the data source's free tier caps history at ~2 years,
+    // so they rendered identical charts.
     const TIME_RANGES = {
-        '1D': 1,
         '1W': 7,
         '1M': 30,
+        'YTD': Math.max(1, Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24))),
         '1Y': 365,
-        'YTD': Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24)),
-        '3Y': 1095,
-        '5Y': 1825
+        'Max': 9999
     };
 
     // Company snapshot for the selected symbol
@@ -784,7 +803,18 @@ const Dashboard = () => {
                                     </div>
 
                                     {/* Price Chart */}
-                                    <div className="flex justify-end gap-1 mb-2">
+                                    <div className="flex justify-between items-center gap-2 mb-2 flex-wrap">
+                                        {wk52 ? (
+                                            <div className="flex gap-2 items-center">
+                                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-100">
+                                                    ▲ 52W High ${wk52.high.toLocaleString()}
+                                                </span>
+                                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-red-50 text-red-600 border border-red-100">
+                                                    ▼ 52W Low ${wk52.low.toLocaleString()}
+                                                </span>
+                                            </div>
+                                        ) : <div />}
+                                        <div className="flex gap-1">
                                         {Object.keys(TIME_RANGES).map(range => (
                                             <button
                                                 key={range}
@@ -797,6 +827,7 @@ const Dashboard = () => {
                                                 {range}
                                             </button>
                                         ))}
+                                        </div>
                                     </div>
                                     <div className="h-64 w-full mb-6">
                                         <ResponsiveContainer width="100%" height="100%">
@@ -818,9 +849,13 @@ const Dashboard = () => {
                                                         if (['1D', '1W'].includes(timeRange)) {
                                                             return date.toLocaleDateString('en-US', { weekday: 'short' });
                                                         }
-                                                        // 1M/YTD: show Date (Jan 25)
-                                                        else if (['1M', 'YTD'].includes(timeRange)) {
+                                                        // 1M: show Date (Jan 25)
+                                                        else if (timeRange === '1M') {
                                                             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                                        }
+                                                        // YTD: months within the current year
+                                                        else if (timeRange === 'YTD') {
+                                                            return date.toLocaleDateString('en-US', { month: 'short' });
                                                         }
                                                         // 1Y+: show Month + Year (Jan '26) so long ranges stay unambiguous
                                                         else {
@@ -829,11 +864,12 @@ const Dashboard = () => {
                                                     }}
                                                 />
                                                 <YAxis
-                                                    // Stretch the domain so the 52-week band is always visible,
-                                                    // even when the selected range trades far inside it.
+                                                    // Domain stretches only for 52W lines that are close enough
+                                                    // to the data to stay presentable; far-away extremes are
+                                                    // shown as chips above the chart instead.
                                                     domain={[
-                                                        (dataMin) => (wk52 ? Math.min(dataMin, wk52.low) * 0.995 : dataMin * 0.995),
-                                                        (dataMax) => (wk52 ? Math.max(dataMax, wk52.high) * 1.005 : dataMax * 1.005),
+                                                        (dataMin) => (chartScale ? chartScale.yMin : dataMin * 0.995),
+                                                        (dataMax) => (chartScale ? chartScale.yMax : dataMax * 1.005),
                                                     ]}
                                                     tick={{ fontSize: 10, fill: '#9ca3af' }}
                                                     tickFormatter={(value) => `$${value.toFixed(0)}`}
@@ -844,7 +880,7 @@ const Dashboard = () => {
                                                     labelStyle={{ display: 'none' }}
                                                     formatter={(value) => [`$${value.toFixed(2)}`, 'Price']}
                                                 />
-                                                {wk52 && (
+                                                {wk52 && chartScale?.showHigh && (
                                                     <ReferenceLine
                                                         y={wk52.high}
                                                         stroke="#16a34a"
@@ -853,7 +889,7 @@ const Dashboard = () => {
                                                         label={{ value: `52W High $${wk52.high.toLocaleString()}`, position: 'insideTopRight', fontSize: 10, fill: '#16a34a', fontWeight: 700 }}
                                                     />
                                                 )}
-                                                {wk52 && (
+                                                {wk52 && chartScale?.showLow && (
                                                     <ReferenceLine
                                                         y={wk52.low}
                                                         stroke="#dc2626"
