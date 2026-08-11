@@ -1,12 +1,40 @@
+import time
+import asyncio
 import httpx
 
 class PolymarketService:
     BASE_URL = "https://gamma-api.polymarket.com"
+    CACHE_TTL = 1800  # 30 min
+
+    def __init__(self):
+        self._cache = {}   # keyword -> (markets, fetched_at)
+        self._locks = {}
+
+    def _get_cached(self, keyword):
+        hit = self._cache.get(keyword)
+        if hit and time.monotonic() - hit[1] < self.CACHE_TTL:
+            return hit[0]
+        return None
 
     async def get_related_markets(self, keyword: str):
         """
         Fetch top markets related to a keyword (commodity name/symbol).
+        Cached 30 min per symbol.
         """
+        cached = self._get_cached(keyword)
+        if cached is not None:
+            return cached
+
+        lock = self._locks.setdefault(keyword, asyncio.Lock())
+        async with lock:
+            cached = self._get_cached(keyword)
+            if cached is not None:
+                return cached
+            result = await self._fetch_related_markets(keyword)
+            self._cache[keyword] = (result, time.monotonic())
+            return result
+
+    async def _fetch_related_markets(self, keyword: str):
         async with httpx.AsyncClient() as client:
             try:
                 # Search for events/markets
@@ -29,13 +57,19 @@ class PolymarketService:
                 # Client-side filtering because API search might be limited
                 # Keywords to look for based on symbol
                 search_terms = {
-                    "CL": ["oil", "crude", "energy"],
-                    "GC": ["gold", "metal"],
+                    "CL": ["oil", "crude", "opec", "wti"],
+                    "GC": ["gold"],
                     "SI": ["silver"],
                     "HG": ["copper"],
-                    "NG": ["gas", "energy"]
+                    "NG": ["natural gas", "nat gas"],
+                    # Common stock/ETF tickers -> company names as they appear
+                    # in market questions (tickers themselves rarely do)
+                    "AAPL": ["apple"], "TSLA": ["tesla"], "NVDA": ["nvidia"],
+                    "MSFT": ["microsoft"], "GOOGL": ["google", "alphabet"],
+                    "AMZN": ["amazon"], "AMD": ["amd"],
+                    "SPY": ["s&p"], "QQQ": ["nasdaq"],
                 }
-                
+
                 terms = search_terms.get(keyword, [keyword])
                 import re
                 

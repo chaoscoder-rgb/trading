@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # base64 of the PEM file (easier to put in an env var):
     #   base64 -w0 kalshi-key.pem   ->  KALSHI_RSA_PRIVATE_KEY=<output>
     KALSHI_API_KEY: str = ""
-    KALSHI_BASE_URL: str = "https://trading-api.kalshi.com/trade-api/v2"
+    KALSHI_BASE_URL: str = "https://external-api.kalshi.com/trade-api/v2"
     KALSHI_RSA_PRIVATE_KEY: str = ""
 
     # Email

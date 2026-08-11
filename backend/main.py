@@ -141,7 +141,8 @@ async def get_commodities(background_tasks: BackgroundTasks, db = Depends(get_db
                     "unusual_flow": analysis.get('unusual_flow'),
                     "historical_accuracy": analysis.get('historical_accuracy'),
                     "risk": risk_data,
-                    "polls": analysis.get('polls', [])
+                    "polls": analysis.get('polls', []),
+                    "kalshi": analysis.get('kalshi', [])
                 }
             }
 
