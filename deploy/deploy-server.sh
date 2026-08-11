@@ -41,7 +41,7 @@ if [[ ! -f backend/.env ]]; then
   cat > backend/.env <<'EOF'
 # TradeVision server secrets — this file stays on the server, never in git.
 # All keys optional; missing keys => simulated data for that source.
-#TWELVEDATA_API_KEY=
+#MASSIVE_API_KEY=
 #FINNHUB_API_KEY=
 #FRED_API_KEY=
 #KALSHI_API_KEY=

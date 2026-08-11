@@ -7,8 +7,10 @@ class Settings(BaseSettings):
     TURSO_AUTH_TOKEN: str = ""
     
     # APIs
-    TWELVEDATA_API_KEY: str = "8bd13d536bd24e8aafd154c4506a588a"
-    TWELVEDATA_BASE_URL: str = "https://api.twelvedata.com"
+    # Massive (massive.com, formerly Polygon.io) — key lives in .env on the
+    # server only; never hardcode it here (public repo).
+    MASSIVE_API_KEY: str = ""
+    MASSIVE_BASE_URL: str = "https://api.massive.com"
     FINNHUB_API_KEY: str = "d5qgtjhr01qhn30fkergd5qgtjhr01qhn30fkes0"
     FINNHUB_BASE_URL: str = "https://finnhub.io/api/v1"
     

@@ -14,17 +14,20 @@ class AnalyticsEngine:
         Calculate risk based on 30-day historical volatility.
         """
         from app.services.data_engine import data_engine
-        prices = await data_engine.get_historical_prices(symbol, days=30)
-        
+        history = await data_engine.get_historical_prices(symbol, days=30)
+        # history is a list of {"date", "close"} dicts — extract the closes.
+        # (Doing arithmetic on the dicts crashed every symbol and emptied
+        # /api/commodities — the failed smoke test.)
+        prices = [p["close"] for p in history if isinstance(p, dict) and p.get("close") is not None]
+
         if len(prices) < 2:
             return {"level": "Medium", "volatility": 0.0, "reason": "Insufficient data"}
 
-        # Calculate daily returns
+        # Calculate daily returns (prices are oldest-first)
         import math
         returns = []
-        for i in range(len(prices)-1):
-            # Using simple percentage returns
-            ret = (prices[i] - prices[i+1]) / prices[i+1]
+        for i in range(1, len(prices)):
+            ret = (prices[i] - prices[i-1]) / prices[i-1]
             returns.append(ret)
             
         # Standard Deviation
