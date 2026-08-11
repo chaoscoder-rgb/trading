@@ -157,6 +157,7 @@ export const runScreener = async (params) => {
     if (params.kalshi) qs.set("kalshi", "true");
     if (params.risk?.length) qs.set("risk", params.risk.join(","));
     if (params.actions?.length) qs.set("action", params.actions.join(","));
+    if (params.minDividend !== '' && params.minDividend != null) qs.set("min_dividend", params.minDividend);
     const response = await fetch(`${API_URL}/api/screener?${qs}`);
     if (!response.ok) throw new Error("Screener query failed");
     return response.json();

@@ -130,7 +130,15 @@ async def get_commodities(background_tasks: BackgroundTasks, db = Depends(get_db
             analysis = await analytics_engine.generate_enhanced_recommendation(data, symbol)
             
             risk_data = analysis.get('risk', {"level": "Medium", "volatility": 0.0})
-            
+
+            # Dividend yield (cached 1h; None when unknown)
+            dividend_yield = None
+            try:
+                from app.services.company_info import company_info_service
+                dividend_yield = await company_info_service.get_dividend_yield(symbol)
+            except Exception:
+                pass
+
             commodity_data = {
                 "id": symbol,
                 "symbol": symbol,
@@ -140,6 +148,7 @@ async def get_commodities(background_tasks: BackgroundTasks, db = Depends(get_db
                 "changePercent": data.get('change_percent', 0.0),
                 "source": data.get('source', 'Simulated'),
                 "message": data.get('message', ''),
+                "dividend_yield": dividend_yield,
                 "risk": risk_data,
                 "recommendation": {
                     "action": analysis['action'],
@@ -202,12 +211,13 @@ async def log_recommendation(symbol: str, action: str, price: float, confidence:
 async def run_screener(universe: str = "sp500", min_confidence: Optional[float] = None,
                        political: bool = False, polymarket: bool = False,
                        kalshi: bool = False, risk: Optional[str] = None,
-                       action: Optional[str] = None, db = Depends(get_db)):
+                       action: Optional[str] = None, min_dividend: Optional[float] = None,
+                       db = Depends(get_db)):
     from app.services.screener import screener_service
     risk_levels = [r.strip() for r in risk.split(",") if r.strip()] if risk else None
     actions = [a.strip() for a in action.split(",") if a.strip()] if action else None
     return await screener_service.query(db, universe, min_confidence, political,
-                                        polymarket, kalshi, risk_levels, actions)
+                                        polymarket, kalshi, risk_levels, actions, min_dividend)
 
 @app.get("/api/screener/universes")
 async def get_screener_universes():

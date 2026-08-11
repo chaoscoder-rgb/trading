@@ -81,13 +81,13 @@ const Dashboard = () => {
     const [editingHolding, setEditingHolding] = useState(null); // null or holding object
 
     // Screener state — combinable filters; universe = watchlist (live) or an index (precomputed)
-    const [screener, setScreener] = useState({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false, risk: [], actions: [] });
+    const [screener, setScreener] = useState({ universe: 'watchlist', minConfidence: '', minDividend: '', political: false, polymarket: false, kalshi: false, risk: [], actions: [] });
     const [showScreener, setShowScreener] = useState(false);
     const [screenerResults, setScreenerResults] = useState(null); // index-universe results
     const [screenerStatus, setScreenerStatus] = useState(null);
     const [screenerLoading, setScreenerLoading] = useState(false);
     const [openDropdown, setOpenDropdown] = useState(null); // 'risk' | 'actions' | null
-    const screenerActive = screener.minConfidence !== '' || screener.political || screener.polymarket || screener.kalshi || screener.risk.length > 0 || screener.actions.length > 0;
+    const screenerActive = screener.minConfidence !== '' || screener.minDividend !== '' || screener.political || screener.polymarket || screener.kalshi || screener.risk.length > 0 || screener.actions.length > 0;
     const indexMode = screener.universe !== 'watchlist';
 
     const RISK_OPTIONS = ['Low', 'Medium', 'High'];
@@ -132,7 +132,7 @@ const Dashboard = () => {
             .catch(err => { console.error(err); if (!cancelled) setScreenerResults({ results: [], matched: 0 }); })
             .finally(() => { if (!cancelled) setScreenerLoading(false); });
         return () => { cancelled = true; };
-    }, [screener.universe, screener.minConfidence, screener.political, screener.polymarket, screener.kalshi,
+    }, [screener.universe, screener.minConfidence, screener.minDividend, screener.political, screener.polymarket, screener.kalshi,
         JSON.stringify(screener.risk), JSON.stringify(screener.actions)]);
 
     const handleWatchFromScreener = async (row) => {
@@ -173,6 +173,10 @@ const Dashboard = () => {
         }
         if (screener.risk.length > 0 && !screener.risk.includes(item.risk?.level)) return false;
         if (screener.actions.length > 0 && !screener.actions.includes(rec.action)) return false;
+        if (screener.minDividend !== '') {
+            const dy = parseFloat(item.dividend_yield);
+            if (isNaN(dy) || dy < parseFloat(screener.minDividend)) return false;
+        }
         return true;
     };
 
@@ -540,6 +544,16 @@ const Dashboard = () => {
                                     onChange={(e) => setScreener({ ...screener, minConfidence: e.target.value })}
                                 />
                             </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 uppercase">Min Dividend</span>
+                                <input
+                                    type="number" min="0" max="25" step="0.1" placeholder="e.g. 2"
+                                    className="border rounded-lg px-3 py-1.5 w-20 text-sm font-mono"
+                                    value={screener.minDividend}
+                                    onChange={(e) => setScreener({ ...screener, minDividend: e.target.value })}
+                                />
+                                <span className="text-xs text-gray-400 font-bold">%</span>
+                            </div>
                             <MultiSelect id="risk" label="⚠️ Risk" options={RISK_OPTIONS} selected={screener.risk} />
                             <MultiSelect id="actions" label="🎯 Recommendation" options={ACTION_OPTIONS} selected={screener.actions} />
                             {[
@@ -558,7 +572,7 @@ const Dashboard = () => {
                             ))}
                             {(screenerActive || indexMode) && (
                                 <button
-                                    onClick={() => { setScreener({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false, risk: [], actions: [] }); setOpenDropdown(null); }}
+                                    onClick={() => { setScreener({ universe: 'watchlist', minConfidence: '', minDividend: '', political: false, polymarket: false, kalshi: false, risk: [], actions: [] }); setOpenDropdown(null); }}
                                     className="ml-auto text-xs font-bold text-red-500 hover:text-red-700 uppercase"
                                 >
                                     ✕ Reset
@@ -617,6 +631,11 @@ const Dashboard = () => {
                                             <div className={`text-[10px] font-bold ${row.change_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {row.change_percent >= 0 ? '+' : ''}{(row.change_percent || 0).toFixed(2)}%
                                             </div>
+                                            {row.dividend_yield != null && (
+                                                <div className="text-[9px] text-purple-600 font-bold" title="Dividend yield">
+                                                    ⏵ {row.dividend_yield.toFixed(2)}% div
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="w-24 text-center">
                                             <div className="text-sm font-black text-gray-800">{(row.confidence || 0).toFixed(0)}</div>

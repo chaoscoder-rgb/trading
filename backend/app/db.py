@@ -148,14 +148,16 @@ async def init_db():
                     kalshi_favor INTEGER,
                     risk_level TEXT,
                     volatility REAL,
+                    dividend_yield REAL,
                     updated_at DATETIME
                 )
             """)
 
-            # Upgrade path for servers whose screener_scores predates risk columns
+            # Upgrade path for servers whose screener_scores predates newer columns
             for ddl in [
                 "ALTER TABLE screener_scores ADD COLUMN risk_level TEXT",
                 "ALTER TABLE screener_scores ADD COLUMN volatility REAL",
+                "ALTER TABLE screener_scores ADD COLUMN dividend_yield REAL",
             ]:
                 try:
                     await client.execute(ddl)

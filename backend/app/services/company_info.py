@@ -35,6 +35,45 @@ class CompanyInfoService:
         self.base_url = settings.FINNHUB_BASE_URL
         self._cache = {}
         self._locks = {}
+        self._metrics_cache = {}   # symbol -> (metrics dict | None, fetched_at)
+
+    async def get_dividend_yield(self, symbol: str):
+        """
+        Dividend yield %% for a symbol (via ETF proxy for commodities), from a
+        lightweight cached metrics call. Returns None when unknown/no key.
+        """
+        m = await self.get_key_metrics(symbol)
+        return m.get("dividend_yield") if m else None
+
+    async def get_key_metrics(self, symbol: str):
+        """Cached Finnhub /stock/metric fetch (1 call, 1h TTL)."""
+        hit = self._metrics_cache.get(symbol)
+        if hit and time.monotonic() - hit[1] < self.CACHE_TTL:
+            return hit[0]
+        if not self.api_key:
+            return None
+        lock = self._locks.setdefault(f"metrics:{symbol}", asyncio.Lock())
+        async with lock:
+            hit = self._metrics_cache.get(symbol)
+            if hit and time.monotonic() - hit[1] < self.CACHE_TTL:
+                return hit[0]
+            lookup = PROXY_MAP.get(symbol, symbol)
+            async with httpx.AsyncClient() as client:
+                metric = await self._get(client, "/stock/metric", {"symbol": lookup, "metric": "all"})
+            m = (metric or {}).get("metric") or {}
+            result = None
+            if m:
+                result = {
+                    "pe": m.get("peTTM") or m.get("peBasicExclExtraTTM"),
+                    "eps": m.get("epsTTM") or m.get("epsBasicExclExtraItemsTTM"),
+                    "week52_high": m.get("52WeekHigh"),
+                    "week52_low": m.get("52WeekLow"),
+                    "dividend_yield": m.get("dividendYieldIndicatedAnnual") or m.get("currentDividendYieldTTM"),
+                    "beta": m.get("beta"),
+                }
+            # cache even None-ish results briefly to avoid hammering on misses
+            self._metrics_cache[symbol] = (result, time.monotonic())
+            return result
 
     def _get_cached(self, symbol):
         hit = self._cache.get(symbol)
