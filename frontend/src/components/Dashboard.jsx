@@ -673,59 +673,39 @@ const Dashboard = () => {
                                                 </div>
                                             )}
 
-                                            {/* Smart Money & Political Flow */}
+                                            {/* Political Flow (STOCK Act disclosures via kadoa open dataset) */}
                                             {selectedCommodity.recommendation.unusual_flow && (
                                                 <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
-                                                        <span className="text-lg">💼</span> Smart Money & Political Flow
-                                                    </h3>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                        <div className="flex flex-col gap-3">
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Insider Activity</span>
-                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${selectedCommodity.recommendation.unusual_flow.insider_status.includes('Buying') ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                                    {selectedCommodity.recommendation.unusual_flow.insider_status}
-                                                                </span>
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                {selectedCommodity.recommendation.unusual_flow.insider_trades?.length > 0 ? (
-                                                                    selectedCommodity.recommendation.unusual_flow.insider_trades.map((tx, idx) => (
-                                                                        <div key={idx} className="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2">
-                                                                            <div className="font-bold text-gray-800">{tx.name || 'Officer'}</div>
-                                                                            <div className={tx.change > 0 ? 'text-green-600' : 'text-red-600'}>
-                                                                                {tx.change > 0 ? '+' : ''}{tx.change?.toLocaleString()} shrs
-                                                                            </div>
-                                                                        </div>
-                                                                    ))
-                                                                ) : (
-                                                                    <div className="text-[10px] text-gray-400 italic">No recent Form 4 filings.</div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="flex flex-col gap-3">
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Congressional Flow</span>
-                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${selectedCommodity.recommendation.unusual_flow.political_status.includes('Bullish') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                                    {selectedCommodity.recommendation.unusual_flow.political_status}
-                                                                </span>
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                {selectedCommodity.recommendation.unusual_flow.political_trades?.length > 0 ? (
-                                                                    selectedCommodity.recommendation.unusual_flow.political_trades.map((tx, idx) => (
-                                                                        <div key={idx} className="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2">
-                                                                            <div className="font-bold text-gray-800">{tx.representative || 'Official'}</div>
-                                                                            <div className={tx.transactionType === 'Purchase' ? 'text-green-600' : 'text-red-600'}>
-                                                                                {tx.transactionType}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))
-                                                                ) : (
-                                                                    <div className="text-[10px] text-gray-400 italic">No recent political disclosures.</div>
-                                                                )}
-                                                            </div>
-                                                        </div>
+                                                    <div className="flex justify-between items-center mb-5">
+                                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                            <span className="text-lg">🏛️</span> Political Flow
+                                                        </h3>
+                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${selectedCommodity.recommendation.unusual_flow.political_status.includes('Bullish') ? 'bg-blue-100 text-blue-700' :
+                                                            selectedCommodity.recommendation.unusual_flow.political_status.includes('Bearish') ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                            {selectedCommodity.recommendation.unusual_flow.political_status}
+                                                        </span>
                                                     </div>
+                                                    <div className="space-y-2">
+                                                        {selectedCommodity.recommendation.unusual_flow.political_trades?.length > 0 ? (
+                                                            selectedCommodity.recommendation.unusual_flow.political_trades.map((tx, idx) => (
+                                                                <div key={idx} className="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2 gap-2">
+                                                                    <div className="min-w-0">
+                                                                        <div className="font-bold text-gray-800 truncate">{tx.representative || 'Official'}</div>
+                                                                        <div className="text-[9px] text-gray-400 uppercase">{[tx.branch, tx.date].filter(Boolean).join(' · ')}</div>
+                                                                    </div>
+                                                                    <div className="text-right shrink-0">
+                                                                        <div className={`font-bold ${tx.transactionType === 'Purchase' ? 'text-green-600' : 'text-red-600'}`}>
+                                                                            {tx.transactionType}
+                                                                        </div>
+                                                                        {tx.amount && <div className="text-[9px] text-gray-400">{tx.amount}</div>}
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="text-[10px] text-gray-400 italic">No disclosed congressional/executive trades for this asset.</div>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-3 text-[9px] text-gray-300 text-right">Source: STOCK Act filings (kadoa open dataset)</div>
                                                 </div>
                                             )}
 

@@ -204,18 +204,10 @@ class AnalyticsEngine:
         # Weights: News 40%, Tech 30%, Polymarket 20%, Macro 10%
         confidence = (news_score * 0.4) + (ti_score * 0.3) + (pm_score * 0.2) + (macro_score * 0.1)
         
-        # Optional: Incorporate Smart Money as a minor bias (e.g., +/- 5 points)
-        from app.services.insider import insider_service
-        insider_tx = await insider_service.get_insider_transactions(symbol)
-        congress_tx = await insider_service.get_congress_trading(symbol)
-        ins_score, insider_status = insider_service.analyze_insider_sentiment(insider_tx)
-        
-        political_signal = "Neutral"
-        if congress_tx:
-            buys = [t for t in congress_tx[:5] if t.get('transactionType') == 'Purchase']
-            sells = [t for t in congress_tx[:5] if t.get('transactionType') == 'Sale']
-            if len(buys) > len(sells): political_signal = "Bullish Political Flow"
-            elif len(sells) > len(buys): political_signal = "Bearish Political Flow"
+        # Political flow context (open STOCK Act dataset — no API key needed)
+        from app.services.congress import congress_service
+        congress_tx = await congress_service.get_trades(symbol)
+        political_signal = congress_service.political_signal(congress_tx)
 
         # 6. Determine Action
         if confidence >= 75: action = "Strong Buy"
@@ -266,9 +258,7 @@ class AnalyticsEngine:
                 "signal": macro_status
             },
             "unusual_flow": {
-                "insider_status": insider_status,
                 "political_status": political_signal,
-                "insider_trades": insider_tx[:3],
                 "political_trades": congress_tx[:3] if congress_tx else []
             },
             "analysis": {
