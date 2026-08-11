@@ -139,3 +139,9 @@ export const fetchStopLossHistory = async () => {
     if (!response.ok) throw new Error("Failed to fetch stop-loss history");
     return response.json();
 };
+
+export const fetchSymbolSnapshot = async (symbol) => {
+    const response = await fetch(`${API_URL}/api/symbols/${symbol}/snapshot`);
+    if (!response.ok) throw new Error("Failed to fetch symbol snapshot");
+    return response.json();
+};

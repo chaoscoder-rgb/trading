@@ -23,6 +23,8 @@ check "trade history API"           200 "$(code "$API_URL/api/history")"
 check "commodities API"             200 "$(code "$API_URL/api/commodities")"
 check "price history API"           200 "$(code "$API_URL/api/commodities/GC/history?days=7")"
 
+check "company snapshot API"        200 "$(code "$API_URL/api/symbols/GC/snapshot")"
+
 # Stop-loss system
 check "stop-loss settings API"      200 "$(code "$API_URL/api/settings/stop-loss")"
 check "alerts API"                  200 "$(code "$API_URL/api/alerts")"

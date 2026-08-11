@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory, fetchStopLossSettings, saveStopLossSettings, setHoldingStopLoss, fetchAlerts, markAlertsRead, fetchStopLossHistory } from '../api';
+import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory, fetchStopLossSettings, saveStopLossSettings, setHoldingStopLoss, fetchAlerts, markAlertsRead, fetchStopLossHistory, fetchSymbolSnapshot } from '../api';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
@@ -28,6 +28,20 @@ const Dashboard = () => {
         '3Y': 1095,
         '5Y': 1825
     };
+
+    // Company snapshot for the selected symbol
+    const [snapshot, setSnapshot] = useState(null);
+    const [loadingSnapshot, setLoadingSnapshot] = useState(false);
+    useEffect(() => {
+        if (!selectedCommodity) { setSnapshot(null); return; }
+        let cancelled = false;
+        setLoadingSnapshot(true);
+        fetchSymbolSnapshot(selectedCommodity.symbol)
+            .then(d => { if (!cancelled) setSnapshot(d); })
+            .catch(() => { if (!cancelled) setSnapshot(null); })
+            .finally(() => { if (!cancelled) setLoadingSnapshot(false); });
+        return () => { cancelled = true; };
+    }, [selectedCommodity?.symbol]);
 
     // Fetch History when commodity or timeRange selected
     useEffect(() => {
@@ -696,6 +710,90 @@ const Dashboard = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Company Snapshot: profile, fundamentals, categorized news */}
+                                            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                                <div className="flex justify-between items-center mb-5">
+                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                        <span className="text-lg">🏢</span> Company Snapshot
+                                                        {snapshot?.is_proxy && <span className="normal-case font-medium text-gray-300 tracking-normal">via {snapshot.lookup_symbol} ETF</span>}
+                                                    </h3>
+                                                    {snapshot?.profile?.weburl && (
+                                                        <a href={snapshot.profile.weburl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-500 hover:underline uppercase">Website ↗</a>
+                                                    )}
+                                                </div>
+
+                                                {loadingSnapshot ? (
+                                                    <div className="text-sm text-gray-400 italic text-center py-6 animate-pulse">Loading company info…</div>
+                                                ) : !snapshot || !snapshot.available ? (
+                                                    <div className="text-xs text-gray-400 italic text-center py-4">
+                                                        Company data unavailable — set FINNHUB_API_KEY on the server to enable this section.
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col gap-5">
+                                                        {/* Profile line */}
+                                                        {snapshot.profile && (
+                                                            <div className="flex items-center gap-3 flex-wrap">
+                                                                {snapshot.profile.logo && <img src={snapshot.profile.logo} alt="" className="w-8 h-8 rounded" />}
+                                                                <div>
+                                                                    <div className="font-bold text-gray-900">{snapshot.profile.name}</div>
+                                                                    <div className="text-[11px] text-gray-500">
+                                                                        {[snapshot.profile.industry, snapshot.profile.exchange,
+                                                                          snapshot.profile.market_cap ? `Mkt cap $${(snapshot.profile.market_cap / 1000).toFixed(1)}B` : null]
+                                                                            .filter(Boolean).join(' · ')}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Key metrics */}
+                                                        {snapshot.metrics && (
+                                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                                {[
+                                                                    ['P/E (TTM)', snapshot.metrics.pe, v => v.toFixed(1)],
+                                                                    ['EPS (TTM)', snapshot.metrics.eps, v => `$${v.toFixed(2)}`],
+                                                                    ['52W High', snapshot.metrics.week52_high, v => `$${v.toFixed(2)}`],
+                                                                    ['52W Low', snapshot.metrics.week52_low, v => `$${v.toFixed(2)}`],
+                                                                    ['Div Yield', snapshot.metrics.dividend_yield, v => `${v.toFixed(2)}%`],
+                                                                ].map(([label, val, fmt]) => (
+                                                                    <div key={label} className="bg-gray-50 rounded-xl p-2.5 text-center border border-gray-100">
+                                                                        <div className="text-[9px] font-bold text-gray-400 uppercase">{label}</div>
+                                                                        <div className="text-sm font-black text-gray-800 font-mono">
+                                                                            {(val ?? null) !== null ? fmt(val) : '—'}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Categorized news */}
+                                                        {[
+                                                            ['earnings', '📊 Earnings & Financials', 'text-blue-700 bg-blue-50 border-blue-100'],
+                                                            ['leadership', '👔 Leadership & Corporate', 'text-purple-700 bg-purple-50 border-purple-100'],
+                                                            ['general', '📰 Other News', 'text-gray-700 bg-gray-50 border-gray-100'],
+                                                        ].map(([bucket, title, colors]) => (
+                                                            snapshot.news[bucket]?.length > 0 && (
+                                                                <div key={bucket} className={`rounded-xl border p-4 ${colors.split(' ').slice(1).join(' ')}`}>
+                                                                    <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${colors.split(' ')[0]}`}>{title}</div>
+                                                                    <ul className="space-y-2">
+                                                                        {snapshot.news[bucket].slice(0, 4).map((n, i) => (
+                                                                            <li key={i} className="text-xs">
+                                                                                <a href={n.url} target="_blank" rel="noreferrer" className="font-bold text-gray-800 hover:text-blue-600 hover:underline leading-snug">
+                                                                                    {n.headline}
+                                                                                </a>
+                                                                                <div className="text-[9px] text-gray-400 uppercase mt-0.5">{[n.source, n.date].filter(Boolean).join(' · ')}</div>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )
+                                                        ))}
+                                                        {!snapshot.news.earnings.length && !snapshot.news.leadership.length && !snapshot.news.general.length && (
+                                                            <div className="text-xs text-gray-400 italic text-center py-2">No news in the last 14 days.</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="bg-green-50/50 rounded-2xl p-6 border border-green-100">

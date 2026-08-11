@@ -185,6 +185,12 @@ async def log_recommendation(symbol: str, action: str, price: float, confidence:
             print(f"Error logging recommendation: {e}")
         break 
 
+@app.get("/api/symbols/{symbol}/snapshot")
+async def get_symbol_snapshot(symbol: str):
+    """Company snapshot: profile, fundamentals, bucketed recent news."""
+    from app.services.company_info import company_info_service
+    return await company_info_service.get_snapshot(symbol)
+
 @app.get("/api/holdings")
 async def get_holdings(db = Depends(get_db)):
     from app.services.stop_loss import stop_loss_service
