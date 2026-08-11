@@ -107,7 +107,11 @@ push to main
 - The GitHub PAT is used only to mint a one-hour runner registration token
   during setup; it is not stored on the server. **Rotate it after setup** —
   it was shared in chat.
-- `backend/.env` lives only on the server (chmod 600).
-- Known repo issue (tracked in the gaps backlog): API keys are still hardcoded
-  as defaults in `backend/app/config.py` and a `.env` is committed — rotate
-  those keys and strip them from the repo.
+- `backend/.env` lives only on the server (chmod 600). ALL API keys
+  (Massive, Finnhub, FRED, Kalshi, SMTP) are read from it — the repo contains
+  no secrets. `KALSHI_RSA_PRIVATE_KEY` accepts base64 of the PEM file:
+  `base64 -w0 kalshi-key.pem`.
+- The old keys (Twelve Data, Finnhub, FRED, Kalshi + RSA key, Zoho SMTP
+  password) were committed to this public repo's history — treat them all as
+  leaked: **rotate each at its provider**, then put the NEW values in the
+  server `.env` only. Optionally purge history with `git filter-repo`.

@@ -17,6 +17,12 @@ class KalshiService:
         if not key_str:
             return None
         try:
+            key_str = key_str.strip()
+            if "-----BEGIN" not in key_str:
+                # env-friendly form: base64 of the PEM file
+                key_str = base64.b64decode(key_str).decode()
+            # .env files often carry literal "\n" sequences
+            key_str = key_str.replace("\\n", "\n")
             return serialization.load_pem_private_key(
                 key_str.encode(),
                 password=None
