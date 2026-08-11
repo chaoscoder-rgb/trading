@@ -129,6 +129,27 @@ async def init_db():
                 )
             """)
 
+            # Precomputed market-wide screener scores (nightly batch)
+            await client.execute("""
+                CREATE TABLE IF NOT EXISTS screener_scores (
+                    symbol TEXT PRIMARY KEY,
+                    name TEXT,
+                    sector TEXT,
+                    price REAL,
+                    change_percent REAL,
+                    confidence REAL,
+                    action TEXT,
+                    ti_score REAL,
+                    news_score REAL,
+                    pm_score REAL,
+                    macro_score REAL,
+                    political_status TEXT,
+                    pm_favor INTEGER,
+                    kalshi_favor INTEGER,
+                    updated_at DATETIME
+                )
+            """)
+
             # Recommendation History (for Self-Correction/Backtesting)
             await client.execute("""
                 CREATE TABLE IF NOT EXISTS recommendation_history (

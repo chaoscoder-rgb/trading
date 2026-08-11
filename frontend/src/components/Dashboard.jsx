@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory, fetchStopLossSettings, saveStopLossSettings, setHoldingStopLoss, fetchAlerts, markAlertsRead, fetchStopLossHistory, fetchSymbolSnapshot } from '../api';
+import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory, fetchStopLossSettings, saveStopLossSettings, setHoldingStopLoss, fetchAlerts, markAlertsRead, fetchStopLossHistory, fetchSymbolSnapshot, runScreener, fetchScreenerStatus, refreshScreener } from '../api';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
@@ -69,10 +69,43 @@ const Dashboard = () => {
     const [loadingHoldings, setLoadingHoldings] = useState(false);
     const [editingHolding, setEditingHolding] = useState(null); // null or holding object
 
-    // Screener state — combinable filters over the loaded watchlist
-    const [screener, setScreener] = useState({ minConfidence: '', political: false, polymarket: false, kalshi: false });
+    // Screener state — combinable filters; universe = watchlist (live) or an index (precomputed)
+    const [screener, setScreener] = useState({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false });
     const [showScreener, setShowScreener] = useState(false);
+    const [screenerResults, setScreenerResults] = useState(null); // index-universe results
+    const [screenerStatus, setScreenerStatus] = useState(null);
+    const [screenerLoading, setScreenerLoading] = useState(false);
     const screenerActive = screener.minConfidence !== '' || screener.political || screener.polymarket || screener.kalshi;
+    const indexMode = screener.universe !== 'watchlist';
+
+    // Query precomputed index scores whenever filters change in index mode
+    useEffect(() => {
+        if (!indexMode) { setScreenerResults(null); return; }
+        let cancelled = false;
+        setScreenerLoading(true);
+        Promise.all([runScreener(screener), fetchScreenerStatus()])
+            .then(([res, status]) => { if (!cancelled) { setScreenerResults(res); setScreenerStatus(status); } })
+            .catch(err => { console.error(err); if (!cancelled) setScreenerResults({ results: [], matched: 0 }); })
+            .finally(() => { if (!cancelled) setScreenerLoading(false); });
+        return () => { cancelled = true; };
+    }, [screener.universe, screener.minConfidence, screener.political, screener.polymarket, screener.kalshi]);
+
+    const handleWatchFromScreener = async (row) => {
+        try {
+            await addCommodity(row.symbol, row.name);
+            loadData();
+        } catch (e) { alert("Failed to add to watchlist"); }
+    };
+
+    const handleScreenerRefresh = async () => {
+        try {
+            const r = await refreshScreener(screener.universe);
+            alert(r.status === 'already_running'
+                ? 'A scoring run is already in progress.'
+                : 'Scoring run started. Dow 30 takes ~10 min; the full S&P 500 ~2 hours (free API rate limits). Results appear as they are scored.');
+            fetchScreenerStatus().then(setScreenerStatus).catch(() => {});
+        } catch (e) { alert("Failed to start scoring run"); }
+    };
 
     const avgYes = (items, key) => {
         if (!items || items.length === 0) return null;
@@ -96,7 +129,9 @@ const Dashboard = () => {
         return true;
     };
 
-    const visibleCommodities = screenerActive ? commodities.filter(matchesScreener) : commodities;
+    // Watchlist filtering applies only in watchlist mode; index mode has its own results panel
+    const visibleCommodities = (screenerActive && screener.universe === 'watchlist')
+        ? commodities.filter(matchesScreener) : commodities;
 
     // Stop-loss & alerts state
     const [slSettings, setSlSettings] = useState(null);
@@ -437,6 +472,18 @@ const Dashboard = () => {
                     {showScreener && (
                         <div className="mt-3 bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-wrap items-center gap-x-6 gap-y-3">
                             <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 uppercase">Universe</span>
+                                <select
+                                    className="border rounded-lg px-3 py-1.5 text-sm font-medium bg-white"
+                                    value={screener.universe}
+                                    onChange={(e) => setScreener({ ...screener, universe: e.target.value })}
+                                >
+                                    <option value="watchlist">My Watchlist (live)</option>
+                                    <option value="sp500">S&P 500</option>
+                                    <option value="dow30">Dow Jones 30</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-gray-500 uppercase">AI Confidence ≥</span>
                                 <input
                                     type="number" min="0" max="100" placeholder="e.g. 60"
@@ -459,16 +506,91 @@ const Dashboard = () => {
                                     <span className="text-sm font-medium text-gray-700">{label}</span>
                                 </label>
                             ))}
-                            {screenerActive && (
+                            {(screenerActive || indexMode) && (
                                 <button
-                                    onClick={() => setScreener({ minConfidence: '', political: false, polymarket: false, kalshi: false })}
+                                    onClick={() => setScreener({ universe: 'watchlist', minConfidence: '', political: false, polymarket: false, kalshi: false })}
                                     className="ml-auto text-xs font-bold text-red-500 hover:text-red-700 uppercase"
                                 >
-                                    ✕ Clear filters
+                                    ✕ Reset
                                 </button>
                             )}
                             <div className="w-full text-[10px] text-gray-400">
-                                "In favor" = average yes-probability across related prediction markets &gt; 50%. Filters apply to your watchlist.
+                                "In favor" = average yes-probability across related prediction markets &gt; 50%.
+                                {indexMode
+                                    ? ' Index scores are precomputed nightly (free API rate limits prevent live scoring of ~500 symbols).'
+                                    : ' Watchlist filters use live data.'}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Index-universe results */}
+                    {showScreener && indexMode && (
+                        <div className="mt-3 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center flex-wrap gap-2">
+                                <div className="text-sm font-bold text-gray-700">
+                                    {screenerLoading ? 'Screening…' :
+                                        screenerResults ? `${screenerResults.matched ?? 0} match${(screenerResults.matched ?? 0) !== 1 ? 'es' : ''} of ${screenerResults.universe_size ?? '—'} constituents` : ''}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {screenerStatus?.running ? (
+                                        <span className="text-[10px] font-bold text-blue-600 animate-pulse uppercase">
+                                            Scoring in progress… {screenerStatus.scored}/{screenerStatus.total}
+                                        </span>
+                                    ) : screenerResults?.results?.[0]?.updated_at ? (
+                                        <span className="text-[10px] text-gray-400 uppercase">
+                                            Scores as of {new Date(screenerResults.results[0].updated_at + 'Z').toLocaleString()}
+                                        </span>
+                                    ) : null}
+                                    <button onClick={handleScreenerRefresh}
+                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 uppercase border border-blue-200 rounded px-2 py-1">
+                                        ↻ Rescore now
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
+                                {!screenerLoading && screenerResults?.results?.length === 0 && (
+                                    <div className="p-6 text-center text-sm text-gray-400">
+                                        {screenerStatus?.scored > 0 || screenerStatus?.running
+                                            ? 'No constituents match the current filters.'
+                                            : 'No precomputed scores yet — hit "Rescore now" to run the first batch (or wait for the 2am nightly run).'}
+                                    </div>
+                                )}
+                                {screenerResults?.results?.map(row => (
+                                    <div key={row.symbol} className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50">
+                                        <div className="w-16 font-black text-gray-800">{row.symbol}</div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-bold text-gray-700 truncate">{row.name}</div>
+                                            <div className="text-[9px] text-gray-400 uppercase">{row.sector || ''}</div>
+                                        </div>
+                                        <div className="text-right font-mono text-sm text-gray-700 w-24">
+                                            ${(row.price || 0).toFixed(2)}
+                                            <div className={`text-[10px] font-bold ${row.change_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {row.change_percent >= 0 ? '+' : ''}{(row.change_percent || 0).toFixed(2)}%
+                                            </div>
+                                        </div>
+                                        <div className="w-24 text-center">
+                                            <div className="text-sm font-black text-gray-800">{(row.confidence || 0).toFixed(0)}</div>
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${(row.action || '').includes('Buy') ? 'bg-green-100 text-green-700' :
+                                                (row.action || '').includes('Sell') ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                {row.action}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-1 w-20 justify-center">
+                                            {(row.political_status || '').includes('Bullish') && <span title="Bullish political flow">🏛️</span>}
+                                            {row.pm_favor === 1 && <span title="Polymarket in favor">📊</span>}
+                                            {row.kalshi_favor === 1 && <span title="Kalshi in favor">📈</span>}
+                                        </div>
+                                        <button
+                                            onClick={() => handleWatchFromScreener(row)}
+                                            disabled={commodities.some(c => c.symbol === row.symbol)}
+                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg ${commodities.some(c => c.symbol === row.symbol)
+                                                ? 'bg-gray-100 text-gray-400 cursor-default'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                                        >
+                                            {commodities.some(c => c.symbol === row.symbol) ? 'Watching' : '+ Watch'}
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
@@ -480,7 +602,7 @@ const Dashboard = () => {
                 <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-200px)] min-h-[600px]">
                     {/* LEFT: Master List */}
                     <div className="lg:w-[350px] flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar shrink-0">
-                        {screenerActive && visibleCommodities.length === 0 && (
+                        {screenerActive && !indexMode && visibleCommodities.length === 0 && (
                             <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-400">
                                 No symbols match the current filters.
                             </div>

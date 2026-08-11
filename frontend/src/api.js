@@ -145,3 +145,30 @@ export const fetchSymbolSnapshot = async (symbol) => {
     if (!response.ok) throw new Error("Failed to fetch symbol snapshot");
     return response.json();
 };
+
+// ---- Market-wide screener ----
+
+export const runScreener = async (params) => {
+    const qs = new URLSearchParams();
+    qs.set("universe", params.universe);
+    if (params.minConfidence !== '' && params.minConfidence != null) qs.set("min_confidence", params.minConfidence);
+    if (params.political) qs.set("political", "true");
+    if (params.polymarket) qs.set("polymarket", "true");
+    if (params.kalshi) qs.set("kalshi", "true");
+    const response = await fetch(`${API_URL}/api/screener?${qs}`);
+    if (!response.ok) throw new Error("Screener query failed");
+    return response.json();
+};
+
+export const fetchScreenerStatus = async () => {
+    const response = await fetch(`${API_URL}/api/screener/status`);
+    if (!response.ok) throw new Error("Failed to fetch screener status");
+    return response.json();
+};
+
+export const refreshScreener = async (universe) => {
+    const qs = universe ? `?universe=${universe}` : '';
+    const response = await fetch(`${API_URL}/api/screener/refresh${qs}`, { method: "POST" });
+    if (!response.ok) throw new Error("Failed to start screener refresh");
+    return response.json();
+};

@@ -68,6 +68,44 @@ class KalshiService:
             return hit[0]
         return None
 
+    async def get_bulk_markets(self):
+        """
+        All open markets (up to 3 pages), simplified to {title, yes}.
+        Shared by the batch screener so scoring 500 symbols costs 3 requests,
+        not 1500. Cached 30 min.
+        """
+        cached = self._get_cached("__bulk__")
+        if cached is not None:
+            return cached
+        lock = self._locks.setdefault("__bulk__", asyncio.Lock())
+        async with lock:
+            cached = self._get_cached("__bulk__")
+            if cached is not None:
+                return cached
+            out = []
+            async with httpx.AsyncClient() as client:
+                try:
+                    cursor = None
+                    for _ in range(3):
+                        params = {"limit": 200, "status": "open"}
+                        if cursor:
+                            params["cursor"] = cursor
+                        resp = await client.get(f"{self.base_url}/markets", params=params, timeout=6.0)
+                        if resp.status_code != 200:
+                            break
+                        data = resp.json()
+                        for m in data.get("markets", []):
+                            yes = m.get("last_price") or m.get("yes_ask") or 0
+                            if 0 < yes < 100 and m.get("title"):
+                                out.append({"title": f"{m['title']} {m.get('subtitle') or ''}".lower(), "yes": int(yes)})
+                        cursor = data.get("cursor")
+                        if not cursor:
+                            break
+                except Exception as e:
+                    print(f"Kalshi bulk fetch error: {e}")
+            self._cache["__bulk__"] = (out, time.monotonic())
+            return out
+
     async def get_market_data(self, ticker: str):
         """
         Open Kalshi markets whose title matches the symbol's search terms.

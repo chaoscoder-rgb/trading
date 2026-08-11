@@ -31,6 +31,9 @@ async def on_startup():
     # Start the stop-loss background monitor
     from app.services.stop_loss import stop_loss_service
     stop_loss_service.start()
+    # Start the nightly market-wide screener batch
+    from app.services.screener import screener_service
+    screener_service.start()
 
 # 4. Models
 class CommodityRequest(BaseModel):
@@ -184,6 +187,35 @@ async def log_recommendation(symbol: str, action: str, price: float, confidence:
         except Exception as e:
             print(f"Error logging recommendation: {e}")
         break 
+
+# ---- Market-wide screener ----
+
+@app.get("/api/screener")
+async def run_screener(universe: str = "sp500", min_confidence: Optional[float] = None,
+                       political: bool = False, polymarket: bool = False,
+                       kalshi: bool = False, db = Depends(get_db)):
+    from app.services.screener import screener_service
+    return await screener_service.query(db, universe, min_confidence, political, polymarket, kalshi)
+
+@app.get("/api/screener/universes")
+async def get_screener_universes():
+    from app.services.screener import screener_service
+    return [{"id": k, "label": v["label"], "size": len(v["symbols"])}
+            for k, v in screener_service.universes.items()]
+
+@app.get("/api/screener/status")
+async def get_screener_status(db = Depends(get_db)):
+    from app.services.screener import screener_service
+    return await screener_service.get_status(db)
+
+@app.post("/api/screener/refresh")
+async def refresh_screener(universe: Optional[str] = None):
+    """Kick a batch scoring run in the background (S&P takes ~2h on free tiers)."""
+    from app.services.screener import screener_service
+    if screener_service._running:
+        return {"status": "already_running"}
+    asyncio.create_task(screener_service.run_batch(universe))
+    return {"status": "started", "universe": universe or "all"}
 
 @app.get("/api/symbols/{symbol}/snapshot")
 async def get_symbol_snapshot(symbol: str):

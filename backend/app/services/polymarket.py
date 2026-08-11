@@ -16,6 +16,50 @@ class PolymarketService:
             return hit[0]
         return None
 
+    async def get_bulk_markets(self):
+        """
+        Top ~200 active markets by volume, simplified to {title, yes}.
+        Shared by the batch screener. Cached 30 min.
+        """
+        cached = self._get_cached("__bulk__")
+        if cached is not None:
+            return cached
+        lock = self._locks.setdefault("__bulk__", asyncio.Lock())
+        async with lock:
+            cached = self._get_cached("__bulk__")
+            if cached is not None:
+                return cached
+            import json as _json
+            out = []
+            async with httpx.AsyncClient() as client:
+                for offset in (0, 100):
+                    try:
+                        resp = await client.get(
+                            f"{self.BASE_URL}/markets",
+                            params={"limit": 100, "offset": offset, "active": "true",
+                                    "closed": "false", "order": "volume", "ascending": "false"},
+                            timeout=6.0,
+                        )
+                        resp.raise_for_status()
+                        for m in resp.json():
+                            prices = m.get("outcomePrices", [])
+                            if isinstance(prices, str):
+                                try:
+                                    prices = _json.loads(prices)
+                                except Exception:
+                                    continue
+                            if prices and len(prices) >= 2 and m.get("question"):
+                                try:
+                                    out.append({"title": m["question"].lower(),
+                                                "yes": float(prices[0]) * 100})
+                                except (ValueError, TypeError):
+                                    continue
+                    except Exception as e:
+                        print(f"Polymarket bulk fetch error: {e}")
+                        break
+            self._cache["__bulk__"] = (out, time.monotonic())
+            return out
+
     async def get_related_markets(self, keyword: str):
         """
         Fetch top markets related to a keyword (commodity name/symbol).
