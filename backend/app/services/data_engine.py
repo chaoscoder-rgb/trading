@@ -170,16 +170,23 @@ class DataEngine:
         return None
 
     async def _fetch_stock_forex_bars(self, client, ticker: str, min_days: int):
-        """Daily bars via the standard aggregates endpoint (stocks/forex)."""
+        """
+        Daily bars via the standard aggregates endpoint (stocks/forex).
+
+        Always fetches a uniform ~2-year window (the free tier's history
+        depth) regardless of the requested range — one cache entry per symbol
+        serves every chart range, so a shallow price fetch can never starve a
+        deep 1Y/3Y chart request. (min_days kept for signature compatibility.)
+        """
         from datetime import datetime, timedelta
         end = datetime.utcnow().date()
-        start = end - timedelta(days=max(min_days, 120) * 2)
+        start = end - timedelta(days=750)
         try:
             resp = await client.get(
                 f"{self.BASE_URL}/v2/aggs/ticker/{ticker}/range/1/day/{start}/{end}",
-                params={"adjusted": "true", "sort": "asc", "limit": 500,
+                params={"adjusted": "true", "sort": "asc", "limit": 600,
                         "apiKey": self.API_KEY},
-                timeout=6.0,
+                timeout=8.0,
             )
             data = resp.json()
             results = data.get("results") or []

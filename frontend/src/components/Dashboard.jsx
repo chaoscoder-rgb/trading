@@ -810,6 +810,7 @@ const Dashboard = () => {
                                                 <XAxis
                                                     dataKey="date"
                                                     tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                                    minTickGap={45}
                                                     tickFormatter={(val) => {
                                                         if (!val) return '';
                                                         const date = new Date(val);
@@ -821,9 +822,9 @@ const Dashboard = () => {
                                                         else if (['1M', 'YTD'].includes(timeRange)) {
                                                             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                                                         }
-                                                        // 1Y+: show Month (Jan)
+                                                        // 1Y+: show Month + Year (Jan '26) so long ranges stay unambiguous
                                                         else {
-                                                            return date.toLocaleDateString('en-US', { month: 'short' });
+                                                            return `${date.toLocaleDateString('en-US', { month: 'short' })} '${String(date.getFullYear()).slice(2)}`;
                                                         }
                                                     }}
                                                 />
