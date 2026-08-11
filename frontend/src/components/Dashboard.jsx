@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchCommodities, placeTrade, fetchHoldings, createHolding, updateHolding, deleteHolding, fetchHistory, searchCommodities, addCommodity, deleteCommodity as deleteCommodityAPI, fetchCommodityHistory, fetchStopLossSettings, saveStopLossSettings, setHoldingStopLoss, fetchAlerts, markAlertsRead, fetchStopLossHistory, fetchSymbolSnapshot, runScreener, fetchScreenerStatus, refreshScreener } from '../api';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('market'); // 'market' | 'holdings'
@@ -10,6 +10,7 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [selectedCommodity, setSelectedCommodity] = useState(null);
     const [historyData, setHistoryData] = useState([]); // Chart data
+    const [wk52, setWk52] = useState(null); // {high, low} — 52-week band for the chart
     const [timeRange, setTimeRange] = useState('1M'); // Time range state
 
     const [tradeAmount, setTradeAmount] = useState(100);
@@ -48,7 +49,17 @@ const Dashboard = () => {
         if (selectedCommodity) {
             const days = TIME_RANGES[timeRange] || 30;
             fetchCommodityHistory(selectedCommodity.symbol, days)
-                .then(data => setHistoryData(data))
+                .then(data => {
+                    // New shape: {history, week52_high, week52_low}; tolerate the old bare array
+                    if (Array.isArray(data)) {
+                        setHistoryData(data);
+                        setWk52(null);
+                    } else {
+                        setHistoryData(data.history || []);
+                        setWk52(data.week52_high != null && data.week52_low != null
+                            ? { high: data.week52_high, low: data.week52_low } : null);
+                    }
+                })
                 .catch(err => console.error("Failed to load history chart", err));
         }
     }, [selectedCommodity, timeRange]);
@@ -798,7 +809,12 @@ const Dashboard = () => {
                                                     }}
                                                 />
                                                 <YAxis
-                                                    domain={['auto', 'auto']}
+                                                    // Stretch the domain so the 52-week band is always visible,
+                                                    // even when the selected range trades far inside it.
+                                                    domain={[
+                                                        (dataMin) => (wk52 ? Math.min(dataMin, wk52.low) * 0.995 : dataMin * 0.995),
+                                                        (dataMax) => (wk52 ? Math.max(dataMax, wk52.high) * 1.005 : dataMax * 1.005),
+                                                    ]}
                                                     tick={{ fontSize: 10, fill: '#9ca3af' }}
                                                     tickFormatter={(value) => `$${value.toFixed(0)}`}
                                                     width={40}
@@ -808,6 +824,24 @@ const Dashboard = () => {
                                                     labelStyle={{ display: 'none' }}
                                                     formatter={(value) => [`$${value.toFixed(2)}`, 'Price']}
                                                 />
+                                                {wk52 && (
+                                                    <ReferenceLine
+                                                        y={wk52.high}
+                                                        stroke="#16a34a"
+                                                        strokeDasharray="6 4"
+                                                        strokeWidth={1.5}
+                                                        label={{ value: `52W High $${wk52.high.toLocaleString()}`, position: 'insideTopRight', fontSize: 10, fill: '#16a34a', fontWeight: 700 }}
+                                                    />
+                                                )}
+                                                {wk52 && (
+                                                    <ReferenceLine
+                                                        y={wk52.low}
+                                                        stroke="#dc2626"
+                                                        strokeDasharray="6 4"
+                                                        strokeWidth={1.5}
+                                                        label={{ value: `52W Low $${wk52.low.toLocaleString()}`, position: 'insideBottomRight', fontSize: 10, fill: '#dc2626', fontWeight: 700 }}
+                                                    />
+                                                )}
                                                 <Area
                                                     type="monotone"
                                                     dataKey="price"

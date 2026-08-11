@@ -100,9 +100,17 @@ async def delete_commodity(symbol: str, db = Depends(get_db)):
 
 @app.get("/api/commodities/{symbol}/history")
 async def get_commodity_history(symbol: str, days: int = 30):
-    history = await data_engine.get_historical_prices(symbol, days)
-    # Return date and price
-    return [{"date": h["date"], "price": h["close"]} for h in history]
+    # Always fetch >= a year of bars so the 52-week band can be computed from
+    # the SAME series the chart displays (independent of the selected range).
+    full = await data_engine.get_historical_prices(symbol, max(days, 365))
+    closes = [h["close"] for h in full if h.get("close") is not None]
+    year = closes[-365:] if len(closes) > 365 else closes
+    sliced = full[-days:] if days < len(full) else full
+    return {
+        "history": [{"date": h["date"], "price": h["close"]} for h in sliced],
+        "week52_high": round(max(year), 2) if year else None,
+        "week52_low": round(min(year), 2) if year else None,
+    }
 
 @app.get("/api/commodities")
 async def get_commodities(background_tasks: BackgroundTasks, db = Depends(get_db)):
