@@ -26,6 +26,24 @@ class Settings(BaseSettings):
     KALSHI_BASE_URL: str = "https://external-api.kalshi.com/trade-api/v2"
     KALSHI_RSA_PRIVATE_KEY: str = ""
 
+    # Goldprice.dev — free metals prices (gold/silver/copper). Anonymous
+    # access works for the core price row; a free key lifts rate limits.
+    GOLDPRICE_API_KEY: str = ""
+    GOLDPRICE_BASE_URL: str = "https://api.goldprice.dev"
+
+    # Fundamentals pillar — World Bank + US Treasury need NO key.
+    WORLDBANK_BASE_URL: str = "https://api.worldbank.org/v2"
+    TREASURY_FISCAL_BASE_URL: str = "https://api.fiscaldata.treasury.gov/services/api/fiscal_service"
+    # Econdb — optional free token (register at econdb.com) for US
+    # industrial production; pillar works without it.
+    ECONDB_API_TOKEN: str = ""
+    ECONDB_BASE_URL: str = "https://www.econdb.com/api"
+
+    # Sentiment — Tradestie WSB is keyless; MarketAux needs a free token.
+    TRADESTIE_BASE_URL: str = "https://api.tradestie.com/v1"
+    MARKETAUX_API_TOKEN: str = ""
+    MARKETAUX_BASE_URL: str = "https://api.marketaux.com/v1"
+
     # Email
     EMAIL_SENDER: str = ""
     EMAIL_PASSWORD: str = ""

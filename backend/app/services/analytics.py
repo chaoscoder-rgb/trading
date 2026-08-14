@@ -176,10 +176,41 @@ class AnalyticsEngine:
         
         ti_score = max(0, min(100, ti_score))
 
-        # 3. Polymarket (20% Weight, Scale 0-100)
+        # 3. Sentiment pillar (20% weight): blends keyword news, MarketAux
+        #    scored NLP sentiment, WallStreetBets retail chatter, and
+        #    Polymarket odds — whichever sources are available.
         from app.services.polymarket import polymarket_service
+        from app.services.marketaux import marketaux_service
+        from app.services.wsb import wsb_service
         polls = await polymarket_service.get_related_markets(symbol)
         pm_score = polymarket_service.calculate_sentiment_score(polls)
+
+        ma = await marketaux_service.get_news_sentiment(symbol)
+        wsb = await wsb_service.get_sentiment(symbol)
+
+        sentiment_components = {"news": news_score, "polymarket": pm_score}
+        if ma:
+            sentiment_components["marketaux"] = ma["score"]
+            # Surface the strongest scored headlines in the analysis panel
+            scored = [a for a in ma["articles"] if a.get("sentiment") is not None]
+            for a in sorted(scored, key=lambda x: -x["sentiment"])[:2]:
+                if a["sentiment"] > 0.1:
+                    sentiment['positives'].append(
+                        {"text": a["title"], "source": f"MarketAux/{a.get('source') or 'news'}"})
+            for a in sorted(scored, key=lambda x: x["sentiment"])[:2]:
+                if a["sentiment"] < -0.1:
+                    sentiment['negatives'].append(
+                        {"text": a["title"], "source": f"MarketAux/{a.get('source') or 'news'}"})
+        if wsb:
+            sentiment_components["wsb"] = wsb["score"]
+
+        sentiment_score = sum(sentiment_components.values()) / len(sentiment_components)
+
+        # 3b. Fundamentals pillar (30% weight) — World Bank / Treasury /
+        #     Econdb supply-demand context (previously missing entirely).
+        from app.services.fundamentals import fundamentals_service
+        fundamentals = await fundamentals_service.get_fundamentals(symbol)
+        fund_score = fundamentals["score"]
 
         # 4. Macro Data (10% Weight, Scale 0-100)
         dxy = await fred_service.get_dollar_index()
@@ -203,9 +234,9 @@ class AnalyticsEngine:
         macro_score = max(0, min(100, macro_raw))
         macro_status = ", ".join(macro_signals) if macro_signals else "Neutral"
 
-        # 5. Weighted Consensus Calculation
-        # Weights: News 40%, Tech 30%, Polymarket 20%, Macro 10%
-        confidence = (news_score * 0.4) + (ti_score * 0.3) + (pm_score * 0.2) + (macro_score * 0.1)
+        # 5. Weighted Consensus Calculation — spec-aligned weights:
+        # Technical 40%, Fundamentals 30%, Sentiment 20%, Macro 10%
+        confidence = (ti_score * 0.4) + (fund_score * 0.3) + (sentiment_score * 0.2) + (macro_score * 0.1)
         
         # Political flow context (open STOCK Act dataset — no API key needed)
         from app.services.congress import congress_service
@@ -246,7 +277,16 @@ class AnalyticsEngine:
                 "news": round(news_score, 1),
                 "technical": round(ti_score, 1),
                 "polymarket": round(pm_score, 1),
-                "macro": round(macro_score, 1)
+                "macro": round(macro_score, 1),
+                "fundamentals": round(fund_score, 1),
+                "sentiment": round(sentiment_score, 1)
+            },
+            "fundamentals": fundamentals,
+            "sentiment_detail": {
+                "score": round(sentiment_score, 1),
+                "components": {k: round(v, 1) for k, v in sentiment_components.items()},
+                "wsb": wsb,
+                "marketaux_active": bool(ma)
             },
             "reason": f"{'Mixed' if abs(ti_score - 50) > 10 else 'Sentiment'} Analysis: {ti_signals[0] if ti_signals else ''}",
             "indicators": {

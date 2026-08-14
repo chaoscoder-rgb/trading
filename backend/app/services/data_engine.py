@@ -286,6 +286,21 @@ class DataEngine:
                 "message": f"{note or 'Massive'}, session {last['date']}",
             }
 
+        # Secondary REAL source before giving up: Goldprice.dev metals spot
+        # (free, keyless) covers GC/SI/HG when Massive has no data.
+        from app.services.metals import metals_service
+        if metals_service.supports(symbol):
+            spot = await metals_service.get_spot(symbol)
+            if spot:
+                return {
+                    "symbol": symbol,
+                    "price": spot["price"],
+                    "change": 0.0,
+                    "change_percent": 0.0,
+                    "source": "Live",
+                    "message": f"Goldprice.dev spot, as of {spot.get('computed_at') or 'now'}",
+                }
+
         return self._simulate_price(symbol, self.SIM_PRICES.get(symbol, 100.0),
                                     reason="Massive API unavailable" if self.API_KEY else "No API key")
 

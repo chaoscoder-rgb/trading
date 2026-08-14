@@ -937,24 +937,60 @@ const Dashboard = () => {
                                                     {selectedCommodity.recommendation.breakdown && (
                                                         <div className="mt-4 pt-4 border-t border-gray-100">
                                                             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">Consensus Breakdown</div>
-                                                            <div className="grid grid-cols-4 gap-2 text-center">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[9px] font-bold text-blue-500">News</span>
-                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.news)}</span>
+                                                            {selectedCommodity.recommendation.breakdown.fundamentals != null ? (
+                                                                <div className="grid grid-cols-4 gap-2 text-center">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[9px] font-bold text-purple-500">Tech 40%</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.technical)}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col border-l border-gray-100">
+                                                                        <span className="text-[9px] font-bold text-amber-600">Fund 30%</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.fundamentals)}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col border-l border-gray-100">
+                                                                        <span className="text-[9px] font-bold text-blue-500">Sent 20%</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.sentiment)}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col border-l border-gray-100">
+                                                                        <span className="text-[9px] font-bold text-green-500">Macro 10%</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.macro)}</span>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex flex-col border-l border-gray-100">
-                                                                    <span className="text-[9px] font-bold text-purple-500">Tech</span>
-                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.technical)}</span>
+                                                            ) : (
+                                                                <div className="grid grid-cols-4 gap-2 text-center">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[9px] font-bold text-blue-500">News</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.news)}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col border-l border-gray-100">
+                                                                        <span className="text-[9px] font-bold text-purple-500">Tech</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.technical)}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col border-l border-gray-100">
+                                                                        <span className="text-[9px] font-bold text-orange-500">Polls</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.polymarket)}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col border-l border-gray-100">
+                                                                        <span className="text-[9px] font-bold text-green-500">Macro</span>
+                                                                        <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.macro)}</span>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex flex-col border-l border-gray-100">
-                                                                    <span className="text-[9px] font-bold text-orange-500">Polls</span>
-                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.polymarket)}</span>
+                                                            )}
+                                                            {selectedCommodity.recommendation.fundamentals?.signals?.length > 0 && (
+                                                                <div className="mt-3 pt-3 border-t border-gray-100 text-left">
+                                                                    <div className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mb-1">Fundamentals</div>
+                                                                    {selectedCommodity.recommendation.fundamentals.signals.slice(0, 3).map((sig, i) => (
+                                                                        <div key={i} className="text-[10px] text-gray-500 leading-snug">• {sig}</div>
+                                                                    ))}
                                                                 </div>
-                                                                <div className="flex flex-col border-l border-gray-100">
-                                                                    <span className="text-[9px] font-bold text-green-500">Macro</span>
-                                                                    <span className="text-xs font-black text-gray-700">{Math.round(selectedCommodity.recommendation.breakdown.macro)}</span>
+                                                            )}
+                                                            {selectedCommodity.recommendation.sentiment_detail?.wsb && (
+                                                                <div className="mt-2 text-[10px] text-gray-500">
+                                                                    <span className="font-bold text-orange-500">r/WSB:</span>{' '}
+                                                                    {selectedCommodity.recommendation.sentiment_detail.wsb.label} on {selectedCommodity.recommendation.sentiment_detail.wsb.ticker}{' '}
+                                                                    ({selectedCommodity.recommendation.sentiment_detail.wsb.comments} comments)
                                                                 </div>
-                                                            </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
