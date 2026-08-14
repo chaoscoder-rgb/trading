@@ -31,9 +31,14 @@ class MetalsService:
     def __init__(self):
         self._cache = {}   # app_symbol -> (payload, fetched_at)
         self._locks = {}   # app_symbol -> asyncio.Lock
+        # Symbols the current plan can't access (403 plan_gated) — remembered
+        # for the process lifetime so we don't re-hit a known-gated endpoint.
+        # Observed 2026-08-14: anonymous/free tier serves GOLD ONLY; silver
+        # and copper need a paid tier (or a key whose plan includes them).
+        self._gated = set()
 
     def supports(self, symbol: str) -> bool:
-        return symbol in self.SYMBOL_MAP
+        return symbol in self.SYMBOL_MAP and symbol not in self._gated
 
     def _get_cached(self, symbol: str):
         hit = self._cache.get(symbol)
@@ -49,7 +54,7 @@ class MetalsService:
         Returns {"price": float, "bid": float|None, "ask": float|None,
                  "computed_at": str} or None on failure.
         """
-        if symbol not in self.SYMBOL_MAP:
+        if symbol not in self.SYMBOL_MAP or symbol in self._gated:
             return None
 
         cached = self._get_cached(symbol)
@@ -74,6 +79,11 @@ class MetalsService:
                         headers=headers,
                         timeout=5.0,
                     )
+                    if resp.status_code == 403 and "plan_gated" in resp.text:
+                        self._gated.add(symbol)
+                        print(f"Goldprice.dev: {symbol} not on current tier "
+                              f"(free = gold only) — disabling for this run")
+                        return None
                     if resp.status_code != 200:
                         print(f"Goldprice.dev HTTP {resp.status_code} for {symbol}: {resp.text[:200]}")
                         return None
