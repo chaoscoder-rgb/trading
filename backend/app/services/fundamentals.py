@@ -57,7 +57,8 @@ class FundamentalsService:
             try:
                 value = await fetch_coro_factory()
             except Exception as e:
-                print(f"Fundamentals fetch failed for {key}: {e}")
+                # repr(): some httpx errors (ReadError etc.) stringify empty
+                print(f"Fundamentals fetch failed for {key}: {e!r}")
                 value = None
             if value is not None:
                 self._cache[key] = (value, time.monotonic())
@@ -68,7 +69,9 @@ class FundamentalsService:
     async def _worldbank_latest(self, indicator: str):
         """Latest non-null value for a World Bank indicator (world aggregate)."""
         async def fetch():
-            async with httpx.AsyncClient() as client:
+            # follow_redirects matters: api.worldbank.org 3xx-redirects some
+            # requests, and an unfollowed redirect looked like a dead source.
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(
                     f"{WB_BASE}/country/WLD/indicator/{indicator}",
                     params={"format": "json", "per_page": 10, "mrnev": 1},
@@ -100,7 +103,7 @@ class FundamentalsService:
     async def get_us_debt_growth(self):
         """YoY growth (%) of total US public debt outstanding."""
         async def fetch():
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 url = f"{TREASURY_BASE}/v2/accounting/od/debt_to_penny"
                 latest = await client.get(
                     url, params={"sort": "-record_date", "page[size]": 1},
@@ -144,7 +147,7 @@ class FundamentalsService:
             return None
 
         async def fetch():
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(
                     f"{ECONDB_BASE}/series/",
                     params={"ticker": "IPUS", "format": "json",

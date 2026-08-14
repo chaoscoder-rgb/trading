@@ -41,6 +41,10 @@ class Settings(BaseSettings):
 
     # Sentiment — Tradestie WSB is keyless; MarketAux needs a free token.
     TRADESTIE_BASE_URL: str = "https://api.tradestie.com/v1"
+    # api.tradestie.com was serving an EXPIRED TLS cert as of 2026-08-14.
+    # Set false to temporarily skip verification for this one public,
+    # read-only feed (no credentials are sent). Re-enable once they renew.
+    TRADESTIE_VERIFY_SSL: bool = True
     MARKETAUX_API_TOKEN: str = ""
     MARKETAUX_BASE_URL: str = "https://api.marketaux.com/v1"
 

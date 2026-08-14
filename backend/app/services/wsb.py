@@ -40,7 +40,10 @@ class WsbService:
                 if time.monotonic() - fetched_at < self.CACHE_TTL:
                     return rows
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(
+                    follow_redirects=True,
+                    verify=settings.TRADESTIE_VERIFY_SSL,
+                ) as client:
                     resp = await client.get(
                         f"{self.BASE_URL}/apps/reddit", timeout=5.0
                     )
@@ -54,7 +57,10 @@ class WsbService:
                     self._cache = (rows, time.monotonic())
                     return rows
             except Exception as e:
-                print(f"Tradestie WSB fetch failed: {e}")
+                msg = f"Tradestie WSB fetch failed: {e!r}"
+                if "CERTIFICATE" in repr(e).upper():
+                    msg += " — their TLS cert is expired; set TRADESTIE_VERIFY_SSL=false in .env to bypass this public read-only feed until they renew"
+                print(msg)
                 return {}
 
     async def get_sentiment(self, symbol: str):

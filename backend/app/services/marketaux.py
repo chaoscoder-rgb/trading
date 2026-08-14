@@ -56,7 +56,7 @@ class MarketauxService:
             if cached is not None:
                 return cached
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(follow_redirects=True) as client:
                     resp = await client.get(
                         f"{self.BASE_URL}/news/all",
                         params={

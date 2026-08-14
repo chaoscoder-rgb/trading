@@ -67,7 +67,7 @@ class MetalsService:
                 headers["Authorization"] = f"Bearer {self.API_KEY}"
 
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(follow_redirects=True) as client:
                     resp = await client.get(
                         f"{self.BASE_URL}/v1/prices",
                         params={"symbol": self.SYMBOL_MAP[symbol]},
@@ -75,14 +75,16 @@ class MetalsService:
                         timeout=5.0,
                     )
                     if resp.status_code != 200:
+                        print(f"Goldprice.dev HTTP {resp.status_code} for {symbol}: {resp.text[:200]}")
                         return None
                     data = resp.json()
-                    # /v1/prices may return a single row or a list of rows
-                    if isinstance(data, list):
-                        data = data[0] if data else {}
-                    row = data.get("data", data)
-                    if isinstance(row, list):
-                        row = row[0] if row else {}
+                    # Live response shape: {"symbols": [{...row...}]}; also
+                    # tolerate a bare list or a single row object.
+                    if isinstance(data, dict):
+                        rows = data.get("symbols") or data.get("data") or [data]
+                    else:
+                        rows = data
+                    row = rows[0] if isinstance(rows, list) and rows else {}
                     price = row.get("price")
                     if price is None or row.get("is_stale"):
                         return None
